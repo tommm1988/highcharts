@@ -69,7 +69,7 @@ var ChartComponent = /** @class */ (function (_super) {
         // Extend via event.
         _this.on('resize', function (e) {
             if (_this.chart) {
-                _this.chart.setSize(e.width, e.height);
+                _this.chart.setSize(e.width, e.height, false);
             }
         });
         var table = (_a = _this.store) === null || _a === void 0 ? void 0 : _a.table;
@@ -144,7 +144,7 @@ var ChartComponent = /** @class */ (function (_super) {
         this.constructChart();
         if (this.chart) {
             var _b = this.dimensions, width = _b.width, height = _b.height;
-            this.chart.setSize(width, height);
+            this.chart.setSize(width, height, false);
         }
     };
     ChartComponent.prototype.constructChart = function () {

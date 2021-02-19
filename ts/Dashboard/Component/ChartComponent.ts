@@ -100,7 +100,7 @@ class ChartComponent extends Component<ChartComponent.Event> {
         // Extend via event.
         this.on('resize', (e: Component.ResizeEvent): void => {
             if (this.chart) {
-                this.chart.setSize(e.width, e.height);
+                this.chart.setSize(e.width, e.height, false);
             }
         });
 
@@ -172,7 +172,7 @@ class ChartComponent extends Component<ChartComponent.Event> {
 
         if (this.chart) {
             const { width, height } = this.dimensions;
-            this.chart.setSize(width, height);
+            this.chart.setSize(width, height, false);
         }
     }
 
