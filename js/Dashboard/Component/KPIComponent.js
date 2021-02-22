@@ -14,7 +14,7 @@ var __extends = (this && this.__extends) || (function () {
 import Component from './Component.js';
 import ChartComponent from './ChartComponent.js';
 import U from '../../Core/Utilities.js';
-var createElement = U.createElement, css = U.css, defined = U.defined, merge = U.merge;
+var createElement = U.createElement, css = U.css, defined = U.defined, isArray = U.isArray, isNumber = U.isNumber, merge = U.merge;
 import AST from '../../Core/Renderer/HTML/AST.js';
 var KPIComponent = /** @class */ (function (_super) {
     __extends(KPIComponent, _super);
@@ -104,6 +104,29 @@ var KPIComponent = /** @class */ (function (_super) {
         if (style) {
             css(this.element, style);
         }
+        var color = this.getValueColor();
+        if (color) {
+            this.value.style.color = color;
+        }
+    };
+    KPIComponent.prototype.getValueColor = function () {
+        var _a = this.options, threshold = _a.threshold, thresholdColors = _a.thresholdColors, value = _a.value;
+        if (thresholdColors && threshold && isNumber(value)) {
+            if (isArray(threshold)) {
+                for (var i = threshold.length - 1; i >= 0; i--) {
+                    if (value >= threshold[i]) {
+                        if (i + 1 < thresholdColors.length) {
+                            return thresholdColors[i + 1];
+                        }
+                        return thresholdColors[thresholdColors.length - 1];
+                    }
+                }
+            }
+            else if (value >= threshold) {
+                return thresholdColors[1];
+            }
+            return thresholdColors[0];
+        }
     };
     KPIComponent.defaultOptions = merge(Component.defaultOptions, {
         className: [
@@ -117,7 +140,8 @@ var KPIComponent = /** @class */ (function (_super) {
         style: {
             boxSizing: 'border-box',
             textAlign: 'center'
-        }
+        },
+        thresholdColors: ['#f45b5b', '#90ed7d']
     });
     KPIComponent.defaultChartOptions = {
         chart: {

@@ -23,7 +23,9 @@ const container = document.getElementById('container');
 
 const kpi = [{
     title: 'Cake',
-    value: 1337
+    value: 1337,
+    threshold: [20000, 200000],
+    thresholdColors: ['#f45b5b', '#f7a35c', '#90ed7d']
 }, {
     title: 'Pie',
     value: 911
@@ -70,7 +72,8 @@ const kpi = [{
             visible: true
         },
         series: [{
-            data: [1, 2, 3, 10, 100, 1000, 9001]
+            data: [1, 2, 3, 10, 100, 1000, 9001],
+            clip: false
         }]
     }
 }].map(config => new KPIComponent({
