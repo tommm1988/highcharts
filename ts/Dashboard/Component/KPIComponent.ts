@@ -6,6 +6,7 @@ const {
     createElement,
     css,
     defined,
+    format,
     isArray,
     isNumber,
     merge
@@ -179,17 +180,25 @@ class KPIComponent extends Component {
         const {
             style,
             title,
-            value
+            valueFormat,
+            valueFormatter
         } = this.options;
+
+        let value = this.options.value;
 
         if (defined(title)) {
             AST.setElementHTML(this.title, title);
         }
         if (defined(value)) {
-            AST.setElementHTML(
-                this.value,
-                typeof value === 'string' ? value : value.toLocaleString()
-            );
+            if (valueFormatter) {
+                value = valueFormatter.call(this, value);
+            } else if (valueFormat) {
+                value = format(valueFormat, { value });
+            } else if (isNumber(value)) {
+                value = value.toLocaleString();
+            }
+
+            AST.setElementHTML(this.value, value);
         }
 
         if (style) {
@@ -237,6 +246,15 @@ namespace KPIComponent {
         thresholdColors?: Array<string>;
         title?: string;
         value?: number|string;
+        valueFormat?: string;
+        valueFormatter?: ValueFormatterCallbackFunction;
+    }
+
+    export interface ValueFormatterCallbackFunction {
+        (
+            this: KPIComponent,
+            value: (number|string)
+        ): string;
     }
 }
 

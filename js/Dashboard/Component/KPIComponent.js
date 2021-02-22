@@ -14,7 +14,7 @@ var __extends = (this && this.__extends) || (function () {
 import Component from './Component.js';
 import ChartComponent from './ChartComponent.js';
 import U from '../../Core/Utilities.js';
-var createElement = U.createElement, css = U.css, defined = U.defined, isArray = U.isArray, isNumber = U.isNumber, merge = U.merge;
+var createElement = U.createElement, css = U.css, defined = U.defined, format = U.format, isArray = U.isArray, isNumber = U.isNumber, merge = U.merge;
 import AST from '../../Core/Renderer/HTML/AST.js';
 var KPIComponent = /** @class */ (function (_super) {
     __extends(KPIComponent, _super);
@@ -94,12 +94,22 @@ var KPIComponent = /** @class */ (function (_super) {
         return this;
     };
     KPIComponent.prototype.updateElements = function () {
-        var _a = this.options, style = _a.style, title = _a.title, value = _a.value;
+        var _a = this.options, style = _a.style, title = _a.title, valueFormat = _a.valueFormat, valueFormatter = _a.valueFormatter;
+        var value = this.options.value;
         if (defined(title)) {
             AST.setElementHTML(this.title, title);
         }
         if (defined(value)) {
-            AST.setElementHTML(this.value, typeof value === 'string' ? value : value.toLocaleString());
+            if (valueFormatter) {
+                value = valueFormatter.call(this, value);
+            }
+            else if (valueFormat) {
+                value = format(valueFormat, { value: value });
+            }
+            else if (isNumber(value)) {
+                value = value.toLocaleString();
+            }
+            AST.setElementHTML(this.value, value);
         }
         if (style) {
             css(this.element, style);

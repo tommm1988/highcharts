@@ -5,6 +5,9 @@ import 'https://code.highcharts.com/es-modules/masters/highcharts-more.src.js';
 import 'https://code.highcharts.com/es-modules/masters/modules/solid-gauge.src.js';
 
 Highcharts.setOptions({
+    lang: {
+        thousandsSep: ','
+    },
     colors: ['#000', ...Highcharts.defaultOptions.colors],
     pane: {
         background: void 0
@@ -31,7 +34,8 @@ const kpi = [{
     value: 911
 }, {
     title: 'Stuff',
-    value: 1881
+    value: 1881,
+    valueFormatter: v => `${(v / 10000).toFixed(1)}%`
 }, {
     title: 'Average stuff',
     value: 69
@@ -45,7 +49,8 @@ const kpi = [{
     }
 }, {
     title: 'Cash',
-    value: 88
+    value: 88,
+    valueFormat: '${value:,.2f}'
 }, {
     title: 'Progress',
     chart: {
