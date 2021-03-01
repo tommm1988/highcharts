@@ -8,6 +8,11 @@ Highcharts.setOptions({
     lang: {
         thousandsSep: ','
     },
+    chart: {
+        style: {
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"'
+        }
+    },
     colors: ['#000', ...Highcharts.defaultOptions.colors],
     pane: {
         background: void 0
@@ -24,6 +29,22 @@ Highcharts.setOptions({
 
 const container = document.getElementById('container');
 
+function getSize() {
+    const width = container.offsetWidth;
+    let size = width / 4 - 20;
+    if (width < 400) {
+        size = width - 20;
+    } else if (width < 700) {
+        size = width / 2 - 20;
+    } else if (width < 1000) {
+        size = width / 3 - 20;
+    }
+
+    return size;
+}
+
+const size = getSize();
+
 const kpi = [{
     title: 'Cake',
     value: 1337,
@@ -31,7 +52,8 @@ const kpi = [{
     thresholdColors: ['#f45b5b', '#f7a35c', '#90ed7d']
 }, {
     title: 'Pie',
-    value: 911
+    value: 911,
+    subtitle: 'Totally'
 }, {
     title: 'Stuff',
     value: 1881,
@@ -42,6 +64,7 @@ const kpi = [{
 }, {
     title: 'Beans',
     value: 7,
+    subtitle: 'Consumed daily',
     chart: {
         series: [{
             data: [1, 20, 3, 15, 9, 32, 2, 15]
@@ -83,25 +106,17 @@ const kpi = [{
     }
 }].map(config => new KPIComponent({
     parentElement: container,
+    dimensions: {
+        width: size,
+        height: size * 0.7
+    },
     ...config
 }).render());
 
-function resize() {
-    const width = container.offsetWidth;
-    let size = width / 4 - 20;
-    if (width < 400) {
-        size = width - 20;
-    } else if (width < 700) {
-        size = width / 2 - 20;
-    } else if (width < 1000) {
-        size = width / 3 - 20;
-    }
-
+window.addEventListener('resize', () => {
+    const size = getSize();
     kpi.forEach(c => c.resize(size, size * 0.7));
-}
-
-resize();
-window.addEventListener('resize', resize);
+});
 
 function random(max, min = 0) {
     return Math.floor(min + Math.random() * (max - min));
@@ -113,7 +128,7 @@ function update() {
     });
 
     if (random(2)) {
-        kpi[6].chart.chart.series[0].setData([{
+        kpi[6].chart.series[0].setData([{
             y: random(101)
         }]);
     }

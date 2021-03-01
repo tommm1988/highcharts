@@ -1,6 +1,7 @@
 import type CSSObject from '../../Core/Renderer/CSSObject';
+import Chart from '../../Core/Chart/Chart.js';
 import Component from './Component.js';
-import ChartComponent from './ChartComponent.js';
+import H from '../../Core/Globals.js';
 import U from '../../Core/Utilities.js';
 const {
     createElement,
@@ -27,6 +28,8 @@ class KPIComponent extends Component {
             },
             style: {
                 boxSizing: 'border-box',
+                display: 'flex',
+                flexDirection: 'column',
                 textAlign: 'center'
             },
             thresholdColors: ['#f45b5b', '#90ed7d']
@@ -35,7 +38,8 @@ class KPIComponent extends Component {
 
     public static defaultChartOptions: Highcharts.Options = {
         chart: {
-            type: 'spline'
+            type: 'spline',
+            backgroundColor: 'transparent'
         },
         title: {
             text: void 0
@@ -69,9 +73,12 @@ class KPIComponent extends Component {
 
     public options: KPIComponent.ComponentOptions;
 
-    private value: HTMLElement;
-    private title: HTMLElement;
-    private chart?: ChartComponent;
+    public title: HTMLElement;
+    public valueWrap: HTMLElement;
+    public value: HTMLElement;
+    public subtitle: HTMLElement;
+    public chartContainer: HTMLElement;
+    public chart?: Chart;
 
     constructor(options: Partial<KPIComponent.ComponentOptions>) {
         options = merge(
@@ -87,19 +94,31 @@ class KPIComponent extends Component {
         this.title = createElement('div', {
             className: `${Component.defaultOptions.className}-kpi-title`
         });
+        this.valueWrap = createElement('div', {
+            className: `${Component.defaultOptions.className}-kpi-value-wrap`
+        });
         this.value = createElement('div', {
             className: `${Component.defaultOptions.className}-kpi-value`
+        });
+        this.subtitle = createElement('div', {
+            className: `${Component.defaultOptions.className}-kpi-subtitle`
+        });
+        this.chartContainer = createElement('figure', {
+            className: `${Component.defaultOptions.className}-kpi-chart-container`
         });
     }
 
     public load(): this {
         super.load();
 
-        this.updateElements();
-
         this.element.appendChild(this.title);
-        this.element.appendChild(this.value);
+        this.element.appendChild(this.valueWrap);
+        this.valueWrap.appendChild(this.value);
+        this.valueWrap.appendChild(this.subtitle);
+        this.element.appendChild(this.chartContainer);
         this.parentElement.appendChild(this.element);
+
+        this.updateElements();
 
         this.element.style.width = this.dimensions.width + 'px';
         this.element.style.height = this.dimensions.height + 'px';
@@ -115,7 +134,7 @@ class KPIComponent extends Component {
         this.updateSize(width, height);
 
         if (this.chart) {
-            this.chart.resize(width, this.getChartHeight());
+            this.chart.reflow();
         }
 
         return this;
@@ -123,35 +142,18 @@ class KPIComponent extends Component {
 
     private updateSize(width: number, height: number): void {
         this.title.style.fontSize = 0.1 * Math.min(width, height) + 'px';
-        this.value.style.height = this.chart ? '' : height * 0.65 + 'px';
-        this.value.style.lineHeight = this.chart ? '' : height * 0.65 + 'px';
         this.value.style.fontSize = 0.2 * Math.min(width, height) + 'px';
-    }
-
-    private getChartHeight(): number {
-        if (defined(this.options.value)) {
-            return this.dimensions.height / 2;
-        }
-        return this.dimensions.height * 0.75;
+        this.subtitle.style.fontSize = 0.08 * Math.min(width, height) + 'px';
     }
 
     public render(): this {
         super.render();
 
         if (this.options.chart && !this.chart) {
-            this.chart = new ChartComponent({
-                parentElement: this.element,
-                chartOptions: merge(
-                    KPIComponent.defaultChartOptions,
-                    this.options.chart
-                ),
-                dimensions: {
-                    width: this.dimensions.width,
-                    height: this.getChartHeight()
-                }
-            }).render();
-
-            this.chart.chartContainer.style.margin = '0px';
+            this.chart = H.chart(this.chartContainer, merge(
+                KPIComponent.defaultChartOptions,
+                this.options.chart
+            ));
         }
 
         return this;
@@ -167,9 +169,7 @@ class KPIComponent extends Component {
         super.update(options);
 
         if (options.chart && this.chart) {
-            this.chart.update({
-                chartOptions: options.chart
-            });
+            this.chart.update(options.chart);
         }
 
         this.redraw();
@@ -179,6 +179,7 @@ class KPIComponent extends Component {
     private updateElements(): void {
         const {
             style,
+            subtitle,
             title,
             valueFormat,
             valueFormatter
@@ -189,6 +190,7 @@ class KPIComponent extends Component {
         if (defined(title)) {
             AST.setElementHTML(this.title, title);
         }
+
         if (defined(value)) {
             if (valueFormatter) {
                 value = valueFormatter.call(this, value);
@@ -199,10 +201,26 @@ class KPIComponent extends Component {
             }
 
             AST.setElementHTML(this.value, value);
+
+            this.valueWrap.style.flex = '1';
+        } else {
+            this.valueWrap.style.flex = '0';
+        }
+
+        if (defined(subtitle)) {
+            AST.setElementHTML(this.subtitle, subtitle);
         }
 
         if (style) {
             css(this.element, style);
+        }
+
+        css(this.chartContainer, {
+            flex: this.options.chart ? 1 : 0
+        });
+
+        if (this.chart) {
+            this.chart.reflow();
         }
 
         const color = this.getValueColor();
@@ -246,6 +264,7 @@ namespace KPIComponent {
         thresholdColors?: Array<string>;
         title?: string;
         value?: number|string;
+        subtitle?: string;
         valueFormat?: string;
         valueFormatter?: ValueFormatterCallbackFunction;
     }

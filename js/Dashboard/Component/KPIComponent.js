@@ -12,7 +12,7 @@ var __extends = (this && this.__extends) || (function () {
     };
 })();
 import Component from './Component.js';
-import ChartComponent from './ChartComponent.js';
+import H from '../../Core/Globals.js';
 import U from '../../Core/Utilities.js';
 var createElement = U.createElement, css = U.css, defined = U.defined, format = U.format, isArray = U.isArray, isNumber = U.isNumber, merge = U.merge;
 import AST from '../../Core/Renderer/HTML/AST.js';
@@ -27,17 +27,29 @@ var KPIComponent = /** @class */ (function (_super) {
         _this.title = createElement('div', {
             className: Component.defaultOptions.className + "-kpi-title"
         });
+        _this.valueWrap = createElement('div', {
+            className: Component.defaultOptions.className + "-kpi-value-wrap"
+        });
         _this.value = createElement('div', {
             className: Component.defaultOptions.className + "-kpi-value"
+        });
+        _this.subtitle = createElement('div', {
+            className: Component.defaultOptions.className + "-kpi-subtitle"
+        });
+        _this.chartContainer = createElement('figure', {
+            className: Component.defaultOptions.className + "-kpi-chart-container"
         });
         return _this;
     }
     KPIComponent.prototype.load = function () {
         _super.prototype.load.call(this);
-        this.updateElements();
         this.element.appendChild(this.title);
-        this.element.appendChild(this.value);
+        this.element.appendChild(this.valueWrap);
+        this.valueWrap.appendChild(this.value);
+        this.valueWrap.appendChild(this.subtitle);
+        this.element.appendChild(this.chartContainer);
         this.parentElement.appendChild(this.element);
+        this.updateElements();
         this.element.style.width = this.dimensions.width + 'px';
         this.element.style.height = this.dimensions.height + 'px';
         this.updateSize(this.dimensions.width, this.dimensions.height);
@@ -47,34 +59,19 @@ var KPIComponent = /** @class */ (function (_super) {
         _super.prototype.resize.call(this, width, height);
         this.updateSize(width, height);
         if (this.chart) {
-            this.chart.resize(width, this.getChartHeight());
+            this.chart.reflow();
         }
         return this;
     };
     KPIComponent.prototype.updateSize = function (width, height) {
         this.title.style.fontSize = 0.1 * Math.min(width, height) + 'px';
-        this.value.style.height = this.chart ? '' : height * 0.65 + 'px';
-        this.value.style.lineHeight = this.chart ? '' : height * 0.65 + 'px';
         this.value.style.fontSize = 0.2 * Math.min(width, height) + 'px';
-    };
-    KPIComponent.prototype.getChartHeight = function () {
-        if (defined(this.options.value)) {
-            return this.dimensions.height / 2;
-        }
-        return this.dimensions.height * 0.75;
+        this.subtitle.style.fontSize = 0.08 * Math.min(width, height) + 'px';
     };
     KPIComponent.prototype.render = function () {
         _super.prototype.render.call(this);
         if (this.options.chart && !this.chart) {
-            this.chart = new ChartComponent({
-                parentElement: this.element,
-                chartOptions: merge(KPIComponent.defaultChartOptions, this.options.chart),
-                dimensions: {
-                    width: this.dimensions.width,
-                    height: this.getChartHeight()
-                }
-            }).render();
-            this.chart.chartContainer.style.margin = '0px';
+            this.chart = H.chart(this.chartContainer, merge(KPIComponent.defaultChartOptions, this.options.chart));
         }
         return this;
     };
@@ -86,15 +83,13 @@ var KPIComponent = /** @class */ (function (_super) {
     KPIComponent.prototype.update = function (options) {
         _super.prototype.update.call(this, options);
         if (options.chart && this.chart) {
-            this.chart.update({
-                chartOptions: options.chart
-            });
+            this.chart.update(options.chart);
         }
         this.redraw();
         return this;
     };
     KPIComponent.prototype.updateElements = function () {
-        var _a = this.options, style = _a.style, title = _a.title, valueFormat = _a.valueFormat, valueFormatter = _a.valueFormatter;
+        var _a = this.options, style = _a.style, subtitle = _a.subtitle, title = _a.title, valueFormat = _a.valueFormat, valueFormatter = _a.valueFormatter;
         var value = this.options.value;
         if (defined(title)) {
             AST.setElementHTML(this.title, title);
@@ -110,9 +105,22 @@ var KPIComponent = /** @class */ (function (_super) {
                 value = value.toLocaleString();
             }
             AST.setElementHTML(this.value, value);
+            this.valueWrap.style.flex = '1';
+        }
+        else {
+            this.valueWrap.style.flex = '0';
+        }
+        if (defined(subtitle)) {
+            AST.setElementHTML(this.subtitle, subtitle);
         }
         if (style) {
             css(this.element, style);
+        }
+        css(this.chartContainer, {
+            flex: this.options.chart ? 1 : 0
+        });
+        if (this.chart) {
+            this.chart.reflow();
         }
         var color = this.getValueColor();
         if (color) {
@@ -149,13 +157,16 @@ var KPIComponent = /** @class */ (function (_super) {
         },
         style: {
             boxSizing: 'border-box',
+            display: 'flex',
+            flexDirection: 'column',
             textAlign: 'center'
         },
         thresholdColors: ['#f45b5b', '#90ed7d']
     });
     KPIComponent.defaultChartOptions = {
         chart: {
-            type: 'spline'
+            type: 'spline',
+            backgroundColor: 'transparent'
         },
         title: {
             text: void 0
