@@ -1096,6 +1096,14 @@ namespace DataTable {
     );
 
     /**
+     * Describes the class JSON of a DataTable.
+     */
+    export interface ClassJSON extends DataJSON.ClassJSON {
+        presentationState?: DataPresentationState.ClassJSON;
+        rows: Array<DataTableRow.ClassJSON>;
+    }
+
+    /**
      * An array of column values.
      */
     export interface Column extends Array<DataTableRow.CellType> {
@@ -1111,11 +1119,12 @@ namespace DataTable {
     }
 
     /**
-     * Describes the class JSON of a DataTable.
+     * Describes the information object for column-related events.
      */
-    export interface ClassJSON extends DataJSON.ClassJSON {
-        presentationState?: DataPresentationState.ClassJSON;
-        rows: Array<DataTableRow.ClassJSON>;
+    export interface ColumnEventObject extends DataEventEmitter.EventObject {
+        readonly type: ColumnEventType;
+        readonly columnName: string;
+        readonly values?: Array<DataTableRow.CellType>;
     }
 
     /**
@@ -1125,15 +1134,6 @@ namespace DataTable {
         readonly type: RowEventType;
         readonly index: number;
         readonly row: DataTableRow;
-    }
-
-    /**
-     * Describes the information object for column-related events.
-     */
-    export interface ColumnEventObject extends DataEventEmitter.EventObject {
-        readonly type: ColumnEventType;
-        readonly columnName: string;
-        readonly values?: Array<DataTableRow.CellType>;
     }
 
     /**
