@@ -26,13 +26,15 @@ const SAMPLE_SIZE = 100000;
 QUnit.test(
     'Benchmark: Convert series data to DataTable',
     function (assert) {
+        const benchmark = [],
+            benchmarkAverages = [];
         // array input
         let seriesData = Utilities
             .generateOHLCSeriesData(SAMPLE_SIZE)
             .map(Utilities.mapOHLCSeriesData);
-        console.log('DataTable benchmark #1');
-        let startTime = window.performance.now();
         // convert
+        Utilities.benchmark(benchmarkAverages);
+        Utilities.benchmark(benchmark);
         let dataTable = new DataTable(
             seriesData.map(data => new DataTableRow({
                 open: data[0],
@@ -42,61 +44,63 @@ QUnit.test(
             }))
         );
         // tests
+        Utilities.benchmark(benchmark);
         assert.strictEqual(
             dataTable.getRowCount(),
             SAMPLE_SIZE
-        );/*
+        );
         for (let i = 0, iEnd = dataTable.getRowCount(); i < iEnd; ++i) {
             assert.strictEqual(
                 dataTable.getRowCell(i, 'open'),
                 seriesData[i][0]
             );
-        }*/
-        let endTime = window.performance.now();
-        let benchmarks = [endTime - startTime];
-        console.log(`DataTable time #1: ${benchmarks[benchmarks.length-1]}`);
+        }
+        // result
+        Utilities.benchmark(benchmark);
+        Utilities.benchmarkResult('DataTable array', benchmark);
         // reset
         seriesData.length = 0;
-        startTime = 0;
         dataTable.clear();
-        endTime = 0;
+        benchmark.length = 0;
         // object input
         seriesData = Utilities.generateOHLCSeriesData(SAMPLE_SIZE);
-        console.log('DataTable benchmark #2');
-        startTime = window.performance.now();
         // convert
+        Utilities.benchmark(benchmarkAverages);
+        Utilities.benchmark(benchmark);
         dataTable = new DataTable(
             seriesData.map(data => new DataTableRow(data))
         );
         // tests
+        Utilities.benchmark(benchmark);
         assert.strictEqual(
             dataTable.getRowCount(),
             SAMPLE_SIZE
-        );/*
+        );
         for (let i = 0, iEnd = dataTable.getRowCount(); i < iEnd; ++i) {
             assert.strictEqual(
                 dataTable.getRowCell(i, 'open'),
                 seriesData[i].open
             );
-        }*/
-        endTime = window.performance.now();
-        benchmarks.push(endTime - startTime);
-        console.log(`DataTable time #2: ${benchmarks[benchmarks.length-1]}`);
-        // result
-        console.log(`DataTable ~time: ${Utilities.getBenchmarkTime(benchmarks)}`);
+        }
+        Utilities.benchmark(benchmark);
+        Utilities.benchmarkResult('DataTable object', benchmark);
+        Utilities.benchmark(benchmarkAverages);
+        Utilities.benchmarkResult('DataTable', benchmarkAverages);
     }
 );
 
 QUnit.test(
     'Benchmark: Convert series data to DataFrame',
     function (assert) {
+        const benchmark = [],
+            benchmarkAverages = [];
         // array input
         let seriesData = Utilities
             .generateOHLCSeriesData(SAMPLE_SIZE)
             .map(Utilities.mapOHLCSeriesData);
-        console.log('DataFrame benchmark #1');
-        let startTime = window.performance.now();
         // convert
+        Utilities.benchmark(benchmarkAverages);
+        Utilities.benchmark(benchmark);
         let frameColumns = { open: [], high: [], low: [], close: [] };
         let columnNames = Object.keys(frameColumns);
         for (let i = 0, iEnd = seriesData.length; i < iEnd; ++i) {
@@ -106,6 +110,7 @@ QUnit.test(
         }
         let dataFrame = new DataFrame(frameColumns);
         // tests
+        Utilities.benchmark(benchmark);
         assert.strictEqual(
             dataFrame.getRowCount(),
             SAMPLE_SIZE
@@ -116,20 +121,19 @@ QUnit.test(
                 seriesData[i][0]
             );
         }
-        let endTime = window.performance.now();
-        let benchmarks = [endTime - startTime];
-        console.log(`DataFrame time #1: ${benchmarks[benchmarks.length-1]}`);
+        // result
+        Utilities.benchmark(benchmark);
+        Utilities.benchmarkResult('DataFrame array', benchmark);
         // reset
         seriesData.length = 0;
-        startTime = 0;
         frameColumns = {};
         dataFrame.clear();
-        endTime = 0;
+        benchmark.length = 0;
         // object input
         seriesData = Utilities.generateOHLCSeriesData(SAMPLE_SIZE);
-        console.log('DataFrame benchmark #2');
-        startTime = window.performance.now();
         // convert
+        Utilities.benchmark(benchmarkAverages);
+        Utilities.benchmark(benchmark);
         frameColumns = { open: [], high: [], low: [], close: [] };
         for (let i = 0, iEnd = seriesData.length; i < iEnd; ++i) {
             for (let j = 0, jEnd = 4; j < jEnd; ++j) {
@@ -138,6 +142,7 @@ QUnit.test(
         }
         dataFrame = new DataFrame(frameColumns);
         // tests
+        Utilities.benchmark(benchmark);
         assert.strictEqual(
             dataFrame.getRowCount(),
             SAMPLE_SIZE
@@ -148,10 +153,9 @@ QUnit.test(
                 seriesData[i].open
             );
         }
-        endTime = window.performance.now();
-        benchmarks.push(endTime - startTime);
-        console.log(`DataFrame time #2: ${benchmarks[benchmarks.length-1]}`);
-        // result
-        console.log(`DataFrame ~time: ${Utilities.getBenchmarkTime(benchmarks)}`);
+        Utilities.benchmark(benchmark);
+        Utilities.benchmarkResult('DataFrame object', benchmark);
+        Utilities.benchmark(benchmarkAverages);
+        Utilities.benchmarkResult('DataFrame', benchmarkAverages);
     }
 );

@@ -5,6 +5,55 @@
  * */
 
 /**
+ * Creates or adds a benchmark.
+ *
+ * @param {Array<number>} [previousBenchmark]
+ * Previous benchmark to add to.
+ *
+ * @return {Array<number>|undefined}
+ * New benchmark, if no previous benchmark provided.
+ */
+export function benchmark(previousBenchmark) {
+    if (!previousBenchmark) {
+        return [window.performance.now()];
+    } else {
+        previousBenchmark.push(window.performance.now());
+    }
+}
+
+
+/**
+ * Calculates average benchmark time from time samples.
+ *
+ * @param {string} description
+ * Benchmark description.
+ *
+ * @param {Array<number>} benchmark
+ * Benchmark time samples.
+ *
+ * @return {number}
+ * Average benchmark time.
+ */
+export function benchmarkResult(description, benchmark) {
+    const benchmarkLength = benchmark.length;
+
+    let mark,
+        totalTime = 0;
+
+    for (let i = 1; i < benchmarkLength; ++i) {
+        mark = (benchmark[i] - benchmark[i-1]);
+        console.log(`${description} #${i}: ${mark}`);
+        totalTime += mark;
+    }
+
+    const average = (totalTime / (benchmarkLength - 1));
+
+    console.log(`${description} ~: ${average}`);
+
+    return average;
+}
+
+/**
  * Generates series data in OHLC format.
  *
  * @param {number} numberOfPoints
@@ -27,27 +76,6 @@ export function generateOHLCSeriesData(numberOfPoints) {
     }
 
     return seriesData;
-}
-
-/**
- * Calculates average benchmark time from time samples.
- *
- * @param {Array<number>} benchmarks
- * Benchmark time samples.
- *
- * @return {number}
- * Average benchmark time.
- */
-export function getBenchmarkTime(benchmarks) {
-    const benchmarksLength = benchmarks.length;
-
-    let totalTime = 0;
-
-    for (let i = 0, iEnd = benchmarksLength; i < iEnd; ++i) {
-        totalTime += benchmarks[i];
-    }
-
-    return (totalTime / benchmarksLength);
 }
 
 /**
