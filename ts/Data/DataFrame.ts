@@ -20,50 +20,38 @@ class DataFrame implements DataEventEmitter<DataFrame.EventObject> {
      * */
 
     public constructor(
-        columnNames: Array<string> = [],
-        columns: Array<DataFrame.Column> = [],
+        columns: Record<string, DataFrame.Column> = {},
         id?: string,
         presentationState: DataPresentationState = new DataPresentationState(),
         converter: DataConverter = new DataConverter()
     ) {
-        let rowCount: number = 0;
 
-        columnNames = columnNames.slice();
-        columns = columns.map(
-            (column: DataFrame.Column): DataFrame.Column => {
-                rowCount = Math.max(rowCount, column.length);
-                return column.slice();
-            }
-        );
-
-        this.columns = columns;
-        this.columnNames = columnNames;
+        const myColumnNames = this.columnNames = Object.keys(columns);
+        this.columns = {};
         this.converter = converter;
         this.id = id || uniqueKey();
         this.presentationState = presentationState;
-        this.rowCount = rowCount;
+        this.rowCount = 0;
 
-        if (columnNames.length < columns.length) {
-            for (let i = 0, iEnd = columns.length; i < iEnd; ++i) {
-                columnNames[i] = i.toString();
+        if (myColumnNames.length) {
+            const myColumns = this.columns;
+
+            let column: DataFrame.Column,
+                columnName: string,
+                maxRowCount: number = 0;
+
+            for (let i = 0, iEnd = myColumnNames.length; i < iEnd; ++i) {
+                columnName = myColumnNames[i];
+                column = [...columns[columnName]];
+                myColumns[columnName] = column;
+                maxRowCount = Math.max(maxRowCount, column.length);
             }
-        } else if (
-            columnNames.length > columns.length
-        ) {
-            for (let i = 0, iEnd = columnNames.length; i < iEnd; ++i) {
-                columns[i] = [];
+
+            for (let i = 0, iEnd = myColumnNames.length; i < iEnd; ++i) {
+                myColumns[myColumnNames[i]].length = maxRowCount;
             }
-        }
 
-        const idIndex = columnNames.indexOf('id');
-
-        if (idIndex > -1) {
-            columnNames.splice(idIndex, 1);
-            this.rowIds = columns
-                .splice(idIndex, 1)[0]
-                .map((value: DataFrame.CellType): string => `${value}`);
-        } else {
-            this.rowIds = [];
+            this.rowCount = maxRowCount;
         }
     }
 
@@ -86,15 +74,13 @@ class DataFrame implements DataEventEmitter<DataFrame.EventObject> {
 
     private columnNames: Array<string>;
 
-    private columns: Array<DataFrame.Column>;
+    private columns: Record<string, DataFrame.Column>;
 
     public id: string;
 
     public readonly presentationState: DataPresentationState;
 
     private rowCount: number;
-
-    private rowIds: Array<string>;
 
     /**
      * Internal version tag that changes with each modification of the table or
@@ -121,35 +107,32 @@ class DataFrame implements DataEventEmitter<DataFrame.EventObject> {
 
         this.emit({ type: 'clearFrame', detail: eventDetail });
 
-        this.columns.length = 0;
+        this.columns = {};
         this.columnNames.length = 0;
-        this.rowIds.length = 0;
 
         this.emit({ type: 'afterClearFrame', detail: eventDetail });
     }
 
-    public clone(includeData?: boolean): DataFrame {
+    public clone(): DataFrame {
         const frame = this,
             newFrame = new DataFrame(
-                frame.columnNames,
-                (includeData ? frame.columns : []),
+                frame.columns,
                 frame.id,
                 frame.presentationState,
                 frame.converter
             ),
-            aliasMapNames = Object.keys(frame.aliasMap);
+            aliases = Object.keys(frame.aliasMap);
 
-        newFrame.rowIds = frame.rowIds.slice();
         newFrame.versionTag = frame.versionTag;
 
         for (
             let k = 0,
-                kEnd = aliasMapNames.length,
+                kEnd = aliases.length,
                 alias: string;
             k < kEnd;
             ++k
         ) {
-            alias = aliasMapNames[k];
+            alias = aliases[k];
             newFrame.aliasMap[alias] = frame.aliasMap[alias];
         }
 
@@ -175,86 +158,87 @@ class DataFrame implements DataEventEmitter<DataFrame.EventObject> {
     }
 
     /**
-     * Deletes a column of cells from the table.
+     * Deletes a column from the table.
      *
      * @param {string} columnName
      * Name (no alias) of column that shall be deleted.
      *
-     * @return {boolean}
-     * `true` if at least one cell is deleted.
+     * @return {DataFrame.Column|undefined}
+     * Returns the deleted column, if found.
      */
     public deleteColumn(
         columnName: string
-    ): boolean {
+    ): (DataFrame.Column|undefined) {
         const frame = this,
             columnNames = frame.columnNames,
-            columnIndex = columnNames.indexOf(columnName),
-            columns = frame.columns;
+            columns = frame.columns,
+            deletedColumn = columns[columnName];
 
-        if (columnIndex > 0) {
-            columnNames.splice(columnIndex, 1);
-            columns.splice(columnIndex, 1);
-            return true;
+        if (deletedColumn) {
+            columnNames.splice(columnNames.indexOf(columnName), 1);
+            delete columns[columnName];
+            return deletedColumn;
         }
-
-        return false;
     }
 
     /**
-     * Deletes a column alias for this table.
+     * Deletes a column alias and returns the original column name.
      *
      * @param {string} alias
      * The alias to delete.
+     *
+     * @return {string|undefined}
+     * Returns the original column name, if found.
      */
-    public deleteColumnAlias(alias: string): void {
-        delete this.aliasMap[alias];
+    public deleteColumnAlias(alias: string): (string|undefined) {
+        const frame = this,
+            aliasMap = frame.aliasMap,
+            deletedAlias = aliasMap[alias];
+
+        if (deletedAlias) {
+            delete this.aliasMap[alias];
+            return deletedAlias;
+        }
     }
 
     /**
-     * Deletes a row in this table.
+     * Deletes a row in this frame.
      *
-     * @param {string|DataTableRow} row
-     * Row or row ID to delete.
+     * @param {number} rowIndex
+     * Row index to delete.
      *
      * @param {DataEventEmitter.EventDetail} [eventDetail]
      * Custom information for pending events.
      *
-     * @return {boolean}
-     * Returns true, if the delete was successful, otherwise false.
+     * @return {DataFrame.Row|undefined}
+     * Returns the deleted row, if found.
      *
      * @emits DataTable#deleteRow
      * @emits DataTable#afterDeleteRow
      */
     public deleteRow(
-        row: (number|string),
+        rowIndex: number,
         eventDetail?: DataEventEmitter.EventDetail
     ): (DataFrame.Row|undefined) {
         const frame = this,
+            columnNames = frame.columnNames,
             columns = frame.columns,
             deletedRow: DataFrame.Row = [];
-
-        if (typeof row === 'string') {
-            row = frame.rowIds.indexOf(row);
-        }
-
-        if (row < 0) {
-            return;
-        }
 
         this.emit({
             type: 'deleteRow',
             detail: eventDetail,
-            rowIndex: row
+            rowIndex
         });
 
-        for (let i = 0, iEnd = columns.length; i < iEnd; ++i) {
-            deletedRow.push(...columns[i].splice(row, 1));
+        for (let i = 0, iEnd = columnNames.length; i < iEnd; ++i) {
+            deletedRow.push(...columns[columnNames[i]].splice(rowIndex, 1));
         }
 
         this.emit({
             type: 'afterDeleteRow',
             detail: eventDetail,
-            rowIndex: row
+            rowIndex
         });
 
         return deletedRow;
@@ -272,52 +256,42 @@ class DataFrame implements DataEventEmitter<DataFrame.EventObject> {
     }
 
     /**
-     * Returns an array of all columns.
+     * Returns a collection of all columns.
      *
-     * @param {boolean} [usePresentationOrder]
-     * Whether to use the column order of the presentation state.
-     *
-     * @return {Array<DataFrame.Column>}
-     * Array of all columns.
+     * @return {DataFrame.ColumnCollection}
+     * Collection of all columns.
      */
-    public getAllColumns(
-        usePresentationOrder?: boolean
-    ): Array<DataFrame.Column> {
-        const frame = this;
+    public getAllColumns(): DataFrame.ColumnCollection {
+        const frame = this,
+            columnNames = frame.columnNames,
+            columns = frame.columns,
+            allColumns: DataFrame.ColumnCollection = {};
 
-        if (usePresentationOrder) {
-            const sortedColumnNames = frame.getColumnNames(usePresentationOrder),
-                sortedColumns = [],
-                unsortedColumnNames = frame.columnNames,
-                unsortedColumns = frame.columns;
-
-            for (let i = 0, iEnd = sortedColumnNames.length; i < iEnd; ++i) {
-                sortedColumns.push(unsortedColumns[
-                    unsortedColumnNames.indexOf(sortedColumnNames[i])
-                ].slice());
-            }
-
-            return sortedColumns;
+        for (
+            let i = 0,
+                iEnd = columnNames.length,
+                columnName: string;
+            i < iEnd;
+            ++i
+        ) {
+            columnName = columnNames[i];
+            allColumns[columnName] = [...columns[columnName]];
         }
 
-        return frame.columns.map((column): DataFrame.Column => column.slice());
+        return allColumns;
     }
 
     /**
      * Returns an array of all rows.
      *
-     * @param {boolean} [usePresentationOrder]
-     * Whether to use the column order of the presentation state.
-     *
-     * @return {Array<Array<DataFrame.CellType>>}
+     * @return {Array<DataFrame.Row>}
      * Array of all rows.
      */
-    public getAllRows(
-        usePresentationOrder?: boolean
-    ): Array<Array<DataFrame.CellType>> {
+    public getAllRows(): Array<DataFrame.Row> {
         const frame = this,
-            columns = frame.getAllColumns(usePresentationOrder),
-            rows: Array<Array<DataFrame.CellType>> = [];
+            columns = frame.columns,
+            columnNames = [...frame.columnNames],
+            rows: Array<DataFrame.Row> = [];
 
         if (columns.length) {
             for (
@@ -328,8 +302,8 @@ class DataFrame implements DataEventEmitter<DataFrame.EventObject> {
                 ++i
             ) {
                 row = [];
-                for (let j = 0, jEnd = columns.length; j < jEnd; ++j) {
-                    row.push(columns[j][i]);
+                for (let j = 0, jEnd = columnNames.length; j < jEnd; ++j) {
+                    row.push(columns[columnNames[j]][i]);
                 }
                 rows.push(row);
             }
@@ -345,11 +319,24 @@ class DataFrame implements DataEventEmitter<DataFrame.EventObject> {
      * @param {string} columnNameOrAlias
      * Name or alias of the column to get, alias takes precedence.
      *
-     * @return {DataTable.Column|undefined}
-     * An array with column values, or `undefined` if not found.
+     * @return {DataFrame.Column|undefined}
+     * A copy of the column, or `undefined` if not found.
      */
-    public getColumn(columnNameOrAlias: string): (DataFrame.Column|undefined) {
-        return this.getColumns([columnNameOrAlias])[0];
+    public getColumn(
+        columnNameOrAlias: string
+    ): (DataFrame.Column|undefined) {
+        const frame = this,
+            columns = frame.columns;
+
+        columnNameOrAlias = (
+            frame.aliasMap[columnNameOrAlias] || columnNameOrAlias
+        );
+
+        const column = columns[columnNameOrAlias];
+
+        if (column) {
+            return [...column];
+        }
     }
 
     /**
@@ -361,13 +348,16 @@ class DataFrame implements DataEventEmitter<DataFrame.EventObject> {
      * @return {Array<string>}
      * Column names.
      */
-    public getColumnNames(usePresentationOrder?: boolean): Array<string> {
+    public getColumnNames(
+        usePresentationOrder?: boolean
+    ): Array<string> {
         const frame = this,
-            columnNames = frame.columnNames.slice();
+            columnNames = [...frame.columnNames];
 
         if (usePresentationOrder) {
             columnNames.sort(frame.presentationState.getColumnSorter());
         }
+
         return columnNames;
     }
 
@@ -378,41 +368,38 @@ class DataFrame implements DataEventEmitter<DataFrame.EventObject> {
      * @param {Array<string>} [columnNamesOrAlias]
      * Names or aliases for the columns to get, aliases taking precedence.
      *
-     * @param {boolean} [usePresentationOrder]
-     * Whether to use the column order of the presentation state.
-     *
-     * @return {Array<DataFrame.Column>}
+     * @return {DataFrame.ColumnCollection}
      * A two-dimensional array of the specified columns,
      * if the column does not exist it will be `undefined`
      */
     public getColumns(
-        columnNamesOrAlias: Array<string> = this.getColumnNames(),
-        usePresentationOrder?: boolean
-    ): Array<DataFrame.Column> {
+        columnNamesOrAlias?: Array<string>
+    ): DataFrame.ColumnCollection {
         const frame = this,
             aliasMap = frame.aliasMap,
-            columnNames = frame.columnNames,
             columns = frame.columns,
-            fetchedColumns: Array<DataFrame.Column> = [];
+            fetchedColumns: DataFrame.ColumnCollection = {};
 
-        if (usePresentationOrder) {
-            columnNamesOrAlias.sort(frame.presentationState.getColumnSorter());
+        if (!columnNamesOrAlias) {
+            columnNamesOrAlias = frame.columnNames;
         }
 
         for (
             let i = 0,
                 iEnd = columnNamesOrAlias.length,
-                columnIndex: number,
+                column: DataFrame.Column,
                 columnNameOrAlias: string;
             i < iEnd;
             ++i
         ) {
-            columnIndex = columnNames.indexOf(
-                frame.getRealColumnName(columnNamesOrAlias[i])
+            columnNameOrAlias = columnNamesOrAlias[i];
+            columnNameOrAlias = (
+                aliasMap[columnNameOrAlias] || columnNameOrAlias
             );
+            column = columns[columnNameOrAlias];
 
-            if (columnIndex >= 0) {
-                fetchedColumns[columnIndex] = columns[columnIndex].slice();
+            if (column) {
+                fetchedColumns[columnNameOrAlias] = [...column];
             }
         }
 
@@ -420,41 +407,34 @@ class DataFrame implements DataEventEmitter<DataFrame.EventObject> {
     }
 
     /**
-     * Returns the row with the given index or row ID.
+     * Retrieves the row with the given index.
      *
-     * @param {number|string} row
-     * Row index or row ID.
+     * @param {number} rowIndex
+     * Row index.
      *
-     * @param {boolean} [usePresentationOrder]
-     * Whether to use the column order of the presentation state.
-     *
-     * @return {Array<DataFrame.CellType>}
-     * Column values of this row.
+     * @return {DataFrame.Row}
+     * Row values.
      */
     public getRow(
-        row: (number|string),
-        usePresentationOrder?: boolean
-    ): (Array<DataFrame.CellType>|undefined) {
+        rowIndex: number
+    ): (DataFrame.Row|undefined) {
         const frame = this,
-            columns = frame.getColumns(void 0, usePresentationOrder),
-            fetchedRow = [];
+            columnNames = frame.columnNames,
+            columns = frame.columns,
+            row = new Array(columnNames.length);
 
-        if (typeof row === 'string') {
-            row = (frame.getRowIndex(row) || NaN);
+        for (let i = 0, iEnd = columnNames.length; i < iEnd; ++i) {
+            row[i] = columns[columnNames[i]][rowIndex];
         }
 
-        for (let i = 0, iEnd = columns.length; i < iEnd; ++i) {
-            fetchedRow.push(columns[i][row]);
-        }
-
-        return fetchedRow;
+        return row;
     }
 
     /**
      * Returns the column value for the given row.
      *
-     * @param {number|string} row
-     * Row ID or or index to fetch.
+     * @param {number} rowIndex
+     * Row index to fetch.
      *
      * @param {string} columnNameOrAlias
      * Column name or alias to fetch.
@@ -463,17 +443,20 @@ class DataFrame implements DataEventEmitter<DataFrame.EventObject> {
      * Cell value for the row.
      */
     public getRowCell(
-        row: (number|string),
+        rowIndex: number,
         columnNameOrAlias: string
     ): DataFrame.CellType {
-        const frame = this,
-            frameColumn = (frame.getColumn(columnNameOrAlias) || []);
+        const frame = this;
 
-        if (typeof row === 'string') {
-            row = (frame.getRowIndex(row) || NaN);
+        columnNameOrAlias = (
+            frame.aliasMap[columnNameOrAlias] || columnNameOrAlias
+        );
+
+        const column = frame.columns[columnNameOrAlias];
+
+        if (column) {
+            return column[rowIndex];
         }
-
-        return frameColumn[row];
     }
 
     /**
@@ -487,46 +470,6 @@ class DataFrame implements DataEventEmitter<DataFrame.EventObject> {
      */
     public getRowCount(): number {
         return this.rowCount;
-    }
-
-    /**
-     * Returns the ID of a given row index.
-     *
-     * @param {string} rowIndex
-     * Row index to determ ID for.
-     *
-     * @return {number|undefined}
-     * ID of the row in this frame, undefined if row index does not exist.
-     */
-    public getRowId(rowIndex: number): (string|undefined) {
-        const frame = this;
-
-        if (rowIndex >= frame.rowCount) {
-            let rowId = frame.rowIds[rowIndex];
-
-            if (!rowId) {
-                frame.rowIds[rowIndex] = rowId = uniqueKey();
-            }
-
-            return rowId;
-        }
-    }
-
-    /**
-     * Returns the index of a given row in this table.
-     *
-     * @param {string} rowId
-     * Row to determ index for.
-     *
-     * @return {number|undefined}
-     * Index of the row in this table, undefined if not found.
-     */
-    public getRowIndex(rowId: string): (number|undefined) {
-        const rowIndex = this.rowIds.indexOf(rowId);
-
-        if (rowIndex > -1) {
-            return rowIndex;
-        }
     }
 
     /**
@@ -549,25 +492,12 @@ class DataFrame implements DataEventEmitter<DataFrame.EventObject> {
     }
 
     /**
-     * Maps the alias to a column name, if it exists.
-     *
-     * @param {string} columnNameOrAlias
-     * Column name to check for alias mapping.
-     *
-     * @return {string}
-     * Column name to use in columnNames array.
-     */
-    private getRealColumnName(columnNameOrAlias: string): string {
-        return (this.aliasMap[columnNameOrAlias] || columnNameOrAlias);
-    }
-
-    /**
      * Sets cell values for a column. Will insert a new column
      *
      * @param {string} columnNameOrAlias
      * Column name or alias to set.
      *
-     * @param {DataFrame.Column} columnValues
+     * @param {DataFrame.Column} cellValues
      * Values to set in the column.
      *
      * @return {boolean}
@@ -575,24 +505,20 @@ class DataFrame implements DataEventEmitter<DataFrame.EventObject> {
      */
     public setColumn(
         columnNameOrAlias: string,
-        columnValues: DataFrame.Column = []
+        cellValues: DataFrame.Column = []
     ): boolean {
         const frame = this,
-            columnNames = frame.columnNames;
+            columns = frame.columns;
 
-        columnNameOrAlias = frame.getRealColumnName(columnNameOrAlias);
+        columnNameOrAlias = (
+            frame.aliasMap[columnNameOrAlias] || columnNameOrAlias
+        );
 
-        if (columnNameOrAlias === 'id') {
-            return false;
+        if (!columns[columnNameOrAlias]) {
+            frame.columnNames.push(columnNameOrAlias);
         }
 
-        let columnIndex = columnNames.indexOf(columnNameOrAlias);
-
-        if (columnIndex < 0) {
-            columnIndex = (columnNames.push(columnNameOrAlias) - 1);
-        }
-
-        frame.columns[columnIndex] = columnValues.slice();
+        columns[columnNameOrAlias] = [...cellValues];
 
         return true;
     }
@@ -601,7 +527,7 @@ class DataFrame implements DataEventEmitter<DataFrame.EventObject> {
      * Defines an alias for a column.
      *
      * @param {string} columnAlias
-     * Column alias to create. Cannot be `id`.
+     * Column alias to create.
      *
      * @param {string} columnName
      * Column name to create an alias for.
@@ -612,10 +538,6 @@ class DataFrame implements DataEventEmitter<DataFrame.EventObject> {
     public setColumnAlias(columnAlias: string, columnName: string): boolean {
         const aliasMap = this.aliasMap;
 
-        if (columnAlias === 'id') {
-            return false;
-        }
-
         aliasMap[columnAlias] = columnName;
 
         return true;
@@ -625,11 +547,11 @@ class DataFrame implements DataEventEmitter<DataFrame.EventObject> {
      * Sets cell values based on the rowID/index and column names / alias
      * alias. Will insert a new row if the specified row does not exist.
      *
-     * @param {string|number|undefined} row
-     * Row ID or index. Do not set to generate a new id.
+     * @param {number|undefined} rowIndex
+     * Row index. Do not set to add a new row.
      *
-     * @param {Array<DataFrame.CellType>|Record<string,DataFrame.CellType>} rowCells
-     * Cells as a dictionary of names and values.
+     * @param {Array<DataFrame.CellType>} cellValues
+     * Cell values.
      *
      * @param {DataEventEmitter.EventDetail} [eventDetail]
      * Custom information for pending events.
@@ -638,58 +560,22 @@ class DataFrame implements DataEventEmitter<DataFrame.EventObject> {
      * Returns `true` if successful, otherwise `false`.
      */
     public setRow(
-        row: (string|number) = uniqueKey(),
-        rowCells: (
-            Array<DataFrame.CellType>|
-            Record<string, DataFrame.CellType>
-        ),
+        rowIndex: (number|undefined),
+        cellValues: Array<DataFrame.CellType>,
         eventDetail?: DataEventEmitter.EventDetail
     ): boolean {
         const frame = this,
             columnNames = frame.columnNames,
             columns = frame.columns;
 
-        if (typeof row === 'string') {
-            const rowIndex = frame.getRowIndex(row);
-
-            if (typeof rowIndex === 'number') { // found row id
-                row = rowIndex;
-            } else { // add row id
-                frame.rowIds[frame.rowCount++] = row;
-                row = (frame.rowCount - 1);
-            }
-        } else if (
-            row >= frame.rowCount
-        ) {
-            frame.rowCount = (row + 1);
+        if (typeof rowIndex === 'undefined') {
+            rowIndex = frame.rowCount++;
+        } else if (rowIndex >= frame.rowCount) {
+            frame.rowCount = (rowIndex + 1);
         }
 
-        if (rowCells instanceof Array) {
-            for (let i = 1, iEnd = rowCells.length; i <= iEnd; ++i) {
-                if (!columns[i]) {
-                    columnNames.push(i.toString());
-                    columns.push([]);
-                }
-                columns[i][row] = rowCells[i - 1];
-            }
-        } else {
-            const rowCellNames = Object.keys(rowCells);
-            for (
-                let i = 0,
-                    iEnd = rowCellNames.length,
-                    columnIndex: number,
-                    columnName: string;
-                i < iEnd;
-                ++i
-            ) {
-                columnName = frame.getRealColumnName(rowCellNames[i]);
-                columnIndex = columnNames.indexOf(columnName);
-                if (columnIndex < 0) {
-                    columnIndex = (columnNames.push(columnName) - 1);
-                    columns[columnIndex] = [];
-                }
-                columns[columnIndex][row] = rowCells[rowCellNames[i]];
-            }
+        for (let i = 0, iEnd = cellValues.length; i < iEnd; ++i) {
+            columns[columnNames[i]][rowIndex] = cellValues[i];
         }
 
         return true;
@@ -699,8 +585,8 @@ class DataFrame implements DataEventEmitter<DataFrame.EventObject> {
      * Sets a cell value based on the row ID/index and column name/alias.
      * Will insert a new row if the specified row does not exist.
      *
-     * @param {string|number|undefined} row
-     * Row ID or index to set. `undefined` to add a new row.
+     * @param {number|undefined} rowIndex
+     * Row index to set. Do not set to add a new row.
      *
      * @param {string} columnNameOrAlias
      * Column name or alias to set.
@@ -715,16 +601,35 @@ class DataFrame implements DataEventEmitter<DataFrame.EventObject> {
      * `true` if successful, `false` if not
      */
     public setRowCell(
-        row: (number|string|undefined),
+        rowIndex: (number|undefined),
         columnNameOrAlias: string,
         cellValue: DataFrame.CellType,
         eventDetail?: DataEventEmitter.EventDetail
     ): boolean {
-        return this.setRow(
-            row,
-            { [columnNameOrAlias]: cellValue },
-            eventDetail
+        const frame = this,
+            columns = frame.columns;
+
+        columnNameOrAlias = (
+            frame.aliasMap[columnNameOrAlias] || columnNameOrAlias
         );
+
+        const column = columns[columnNameOrAlias];
+
+        if (column) {
+            if (!rowIndex) {
+                rowIndex = column.length;
+            }
+
+            if (rowIndex >= frame.rowCount) {
+                frame.rowCount = (rowIndex + 1);
+            }
+
+            column[rowIndex] = cellValue;
+
+            return true;
+        }
+
+        return false;
     }
 
 }
