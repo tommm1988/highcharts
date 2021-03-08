@@ -32,9 +32,10 @@ QUnit.test(
         let seriesData = Utilities
             .generateOHLCSeriesData(SAMPLE_SIZE)
             .map(Utilities.mapOHLCSeriesData);
-        // convert
-        Utilities.benchmark(benchmarkAverages);
         Utilities.benchmark(benchmark);
+        Utilities.benchmark(benchmarkAverages);
+        // convert
+        let columnNames = ['open', 'high', 'low', 'close'];
         let dataTable = new DataTable(
             seriesData.map(data => new DataTableRow({
                 open: data[0],
@@ -45,19 +46,26 @@ QUnit.test(
         );
         // tests
         Utilities.benchmark(benchmark);
+        Utilities.benchmark(benchmarkAverages);
         assert.strictEqual(
             dataTable.getRowCount(),
             SAMPLE_SIZE
         );
         for (let i = 0, iEnd = dataTable.getRowCount(); i < iEnd; ++i) {
-            assert.strictEqual(
-                dataTable.getRowCell(i, 'open'),
-                seriesData[i][0]
-            );
+            assert.ok(dataTable.getRowCell(i, 'open'));
+        }
+        Utilities.benchmark(benchmark);
+        for (let i = 0, iEnd = columnNames.length; i < iEnd; ++i) {
+            assert.ok(dataTable.getColumn(columnNames[i]));
+        }
+        Utilities.benchmark(benchmark);
+        for (let i = 0, iEnd = dataTable.getRowCount(); i < iEnd; ++i) {
+            assert.ok(dataTable.getRow(i));
         }
         // result
         Utilities.benchmark(benchmark);
         Utilities.benchmarkResult('DataTable array', benchmark);
+        Utilities.benchmark(benchmarkAverages);
         // reset
         seriesData.length = 0;
         dataTable.clear();
@@ -65,25 +73,42 @@ QUnit.test(
         // object input
         seriesData = Utilities.generateOHLCSeriesData(SAMPLE_SIZE);
         // convert
-        Utilities.benchmark(benchmarkAverages);
-        Utilities.benchmark(benchmark);
         dataTable = new DataTable(
             seriesData.map(data => new DataTableRow(data))
         );
         // tests
         Utilities.benchmark(benchmark);
+        Utilities.benchmark(benchmarkAverages);
         assert.strictEqual(
             dataTable.getRowCount(),
             SAMPLE_SIZE
         );
         for (let i = 0, iEnd = dataTable.getRowCount(); i < iEnd; ++i) {
-            assert.strictEqual(
-                dataTable.getRowCell(i, 'open'),
-                seriesData[i].open
-            );
+            assert.ok(dataTable.getRowCell(i, 'open'));
         }
         Utilities.benchmark(benchmark);
+        for (let i = 0, iEnd = columnNames.length; i < iEnd; ++i) {
+            assert.ok(dataTable.getColumn(columnNames[i]));
+        }
+        Utilities.benchmark(benchmark);
+        for (let i = 0, iEnd = dataTable.getRowCount(); i < iEnd; ++i) {
+            assert.ok(dataTable.getRow(i));
+        }
+        // generic tests
+        Utilities.benchmark(benchmark);
+        Utilities.benchmark(benchmarkAverages);
+        assert.strictEqual(
+            Object.keys(dataTable.getColumns()).length,
+            columnNames.length + 1
+        );
+        assert.strictEqual(
+            dataTable.getAllRows().length,
+            seriesData.length
+        );
+        // result
+        Utilities.benchmark(benchmark);
         Utilities.benchmarkResult('DataTable object', benchmark);
+        // final
         Utilities.benchmark(benchmarkAverages);
         Utilities.benchmarkResult('DataTable', benchmarkAverages);
     }
@@ -98,9 +123,9 @@ QUnit.test(
         let seriesData = Utilities
             .generateOHLCSeriesData(SAMPLE_SIZE)
             .map(Utilities.mapOHLCSeriesData);
-        // convert
-        Utilities.benchmark(benchmarkAverages);
         Utilities.benchmark(benchmark);
+        Utilities.benchmark(benchmarkAverages);
+        // convert
         let frameColumns = { open: [], high: [], low: [], close: [] };
         let columnNames = Object.keys(frameColumns);
         for (let i = 0, iEnd = seriesData.length; i < iEnd; ++i) {
@@ -111,19 +136,26 @@ QUnit.test(
         let dataFrame = new DataFrame(frameColumns);
         // tests
         Utilities.benchmark(benchmark);
+        Utilities.benchmark(benchmarkAverages);
         assert.strictEqual(
             dataFrame.getRowCount(),
             SAMPLE_SIZE
         );
         for (let i = 0, iEnd = dataFrame.getRowCount(); i < iEnd; ++i) {
-            assert.strictEqual(
-                dataFrame.getRowCell(i, 'open'),
-                seriesData[i][0]
-            );
+            assert.ok(dataFrame.getRowCell(i, 'open'))
+        }
+        Utilities.benchmark(benchmark);
+        for (let i = 0, iEnd = columnNames.length; i < iEnd; ++i) {
+            assert.ok(dataFrame.getColumn(columnNames[i]));
+        }
+        Utilities.benchmark(benchmark);
+        for (let i = 0, iEnd = dataFrame.getRowCount(); i < iEnd; ++i) {
+            assert.ok(dataFrame.getRow(i));
         }
         // result
         Utilities.benchmark(benchmark);
         Utilities.benchmarkResult('DataFrame array', benchmark);
+        Utilities.benchmark(benchmarkAverages);
         // reset
         seriesData.length = 0;
         frameColumns = {};
@@ -132,8 +164,6 @@ QUnit.test(
         // object input
         seriesData = Utilities.generateOHLCSeriesData(SAMPLE_SIZE);
         // convert
-        Utilities.benchmark(benchmarkAverages);
-        Utilities.benchmark(benchmark);
         frameColumns = { open: [], high: [], low: [], close: [] };
         for (let i = 0, iEnd = seriesData.length; i < iEnd; ++i) {
             for (let j = 0, jEnd = 4; j < jEnd; ++j) {
@@ -143,18 +173,37 @@ QUnit.test(
         dataFrame = new DataFrame(frameColumns);
         // tests
         Utilities.benchmark(benchmark);
+        Utilities.benchmark(benchmarkAverages);
         assert.strictEqual(
             dataFrame.getRowCount(),
             SAMPLE_SIZE
         );
         for (let i = 0, iEnd = dataFrame.getRowCount(); i < iEnd; ++i) {
-            assert.strictEqual(
-                dataFrame.getRowCell(i, 'open'),
-                seriesData[i].open
-            );
+            assert.ok(dataFrame.getRowCell(i, 'open'));
         }
         Utilities.benchmark(benchmark);
+        for (let i = 0, iEnd = columnNames.length; i < iEnd; ++i) {
+            assert.ok(dataFrame.getColumn(columnNames[i]));
+        }
+        Utilities.benchmark(benchmark);
+        for (let i = 0, iEnd = dataFrame.getRowCount(); i < iEnd; ++i) {
+            assert.ok(dataFrame.getRow(i));
+        }
+        // generic tests
+        Utilities.benchmark(benchmark);
+        Utilities.benchmark(benchmarkAverages);
+        assert.strictEqual(
+            Object.keys(dataFrame.getAllColumns()).length,
+            columnNames.length
+        );
+        assert.strictEqual(
+            dataFrame.getAllRows().length,
+            seriesData.length
+        );
+        // result
+        Utilities.benchmark(benchmark);
         Utilities.benchmarkResult('DataFrame object', benchmark);
+        // final
         Utilities.benchmark(benchmarkAverages);
         Utilities.benchmarkResult('DataFrame', benchmarkAverages);
     }

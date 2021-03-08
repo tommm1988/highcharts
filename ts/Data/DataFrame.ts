@@ -290,23 +290,21 @@ class DataFrame implements DataEventEmitter<DataFrame.EventObject> {
     public getAllRows(): Array<DataFrame.Row> {
         const frame = this,
             columns = frame.columns,
-            columnNames = [...frame.columnNames],
+            columnNames = frame.columnNames,
             rows: Array<DataFrame.Row> = [];
 
-        if (columns.length) {
-            for (
-                let i = 0,
-                    iEnd = columns[0].length,
-                    row: Array<DataFrame.CellType>;
-                i < iEnd;
-                ++i
-            ) {
-                row = [];
-                for (let j = 0, jEnd = columnNames.length; j < jEnd; ++j) {
-                    row.push(columns[columnNames[j]][i]);
-                }
-                rows.push(row);
+        for (
+            let i = 0,
+                iEnd = frame.rowCount,
+                row: Array<DataFrame.CellType>;
+            i < iEnd;
+            ++i
+        ) {
+            row = [];
+            for (let j = 0, jEnd = columnNames.length; j < jEnd; ++j) {
+                row.push(columns[columnNames[j]][i]);
             }
+            rows.push(row);
         }
 
         return rows;
