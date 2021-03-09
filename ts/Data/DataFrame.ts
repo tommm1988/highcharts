@@ -429,6 +429,39 @@ class DataFrame implements DataEventEmitter<DataFrame.EventObject> {
     }
 
     /**
+     * Get a row matching a specific cell value.
+     *
+     * @param {string} columnNameOrAlias
+     * Column to search in.
+     *
+     * @param {DataFrame.CellType} cellValue
+     * Cell value to search for. `NaN` and `undefined` are not supported.
+     *
+     * @return {DataFrame.Row|undefined}
+     * First row with value.
+     */
+    public getRowBy(
+        columnNameOrAlias: string,
+        cellValue: DataFrame.CellType
+    ): (DataFrame.Row|undefined) {
+        const frame = this;
+
+        columnNameOrAlias = (
+            frame.aliasMap[columnNameOrAlias] || columnNameOrAlias
+        );
+
+        const column = frame.columns[columnNameOrAlias];
+
+        if (column) {
+            const rowIndex = column.indexOf(cellValue);
+
+            if (rowIndex > -1) {
+                return frame.getRow(rowIndex);
+            }
+        }
+    }
+
+    /**
      * Returns the column value for the given row.
      *
      * @param {number} rowIndex
@@ -468,6 +501,37 @@ class DataFrame implements DataEventEmitter<DataFrame.EventObject> {
      */
     public getRowCount(): number {
         return this.rowCount;
+    }
+
+    /**
+     * Searches for a specific cell value.
+     *
+     * @param {string} columnNameOrAlias
+     * Column to search in.
+     *
+     * @param {DataFrame.CellType} cellValue
+     * Cell value to search for. `NaN` and `undefined` are not supported.
+     *
+     * @return {boolean}
+     * True, if a row has been found, otherwise false.
+     */
+    public hasRowWith(
+        columnNameOrAlias: string,
+        cellValue: DataFrame.CellType
+    ): boolean {
+        const frame = this;
+
+        columnNameOrAlias = (
+            frame.aliasMap[columnNameOrAlias] || columnNameOrAlias
+        );
+
+        const column = frame.columns[columnNameOrAlias];
+
+        if (column) {
+            return (column.indexOf(cellValue) > -1);
+        }
+
+        return false;
     }
 
     /**
