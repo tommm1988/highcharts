@@ -36,7 +36,7 @@ import DataStore from '../../Data/Stores/DataStore.js';
 import DataJSON from '../../Data/DataJSON.js';
 import H from '../../Core/Globals.js';
 import U from '../../Core/Utilities.js';
-var createElement = U.createElement, merge = U.merge, uniqueKey = U.uniqueKey;
+var createElement = U.createElement, merge = U.merge, uniqueKey = U.uniqueKey, getStyle = U.getStyle;
 /* *
  *
  *  Class
@@ -58,7 +58,7 @@ var ChartComponent = /** @class */ (function (_super) {
         _this.charter = _this.options.Highcharts;
         _this.chartConstructor = _this.options.chartConstructor;
         _this.type = 'chart';
-        _this.chartContainer = createElement('figure');
+        _this.chartContainer = createElement('figure', void 0, void 0, _this.element, true);
         if (_this.options.chartClassName) {
             _this.chartContainer.classList.add(_this.options.chartClassName);
         }
@@ -69,7 +69,11 @@ var ChartComponent = /** @class */ (function (_super) {
         // Extend via event.
         _this.on('resize', function (e) {
             if (_this.chart) {
+<<<<<<< HEAD
                 _this.chart.setSize(e.width, e.height, false);
+=======
+                _this.chart.setSize(Number(getStyle(_this.element, 'width')), Number(getStyle(_this.element, 'height')));
+>>>>>>> 96f2660118a1ac94c800b448236ad8f3d08d1982
             }
         });
         var table = (_a = _this.store) === null || _a === void 0 ? void 0 : _a.table;
