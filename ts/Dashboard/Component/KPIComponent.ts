@@ -80,6 +80,8 @@ class KPIComponent extends Component {
     public chartContainer: HTMLElement;
     public chart?: Chart;
 
+    private prevValue?: number;
+
     constructor(options: Partial<KPIComponent.ComponentOptions>) {
         options = merge(
             KPIComponent.defaultOptions,
@@ -179,7 +181,6 @@ class KPIComponent extends Component {
     private updateElements(): void {
         const {
             style,
-            subtitle,
             title,
             valueFormat,
             valueFormatter
@@ -187,11 +188,14 @@ class KPIComponent extends Component {
 
         let value = this.options.value;
 
-        if (defined(title)) {
-            AST.setElementHTML(this.title, title);
-        }
+        AST.setElementHTML(this.title, title || '');
 
         if (defined(value)) {
+            let prevValue;
+            if (isNumber(value)) {
+                prevValue = value;
+            }
+
             if (valueFormatter) {
                 value = valueFormatter.call(this, value);
             } else if (valueFormat) {
@@ -201,14 +205,12 @@ class KPIComponent extends Component {
             }
 
             AST.setElementHTML(this.value, value);
+            AST.setElementHTML(this.subtitle, this.getSubtitle());
 
+            this.prevValue = prevValue;
             this.valueWrap.style.flex = '1';
         } else {
             this.valueWrap.style.flex = '0';
-        }
-
-        if (defined(subtitle)) {
-            AST.setElementHTML(this.subtitle, subtitle);
         }
 
         if (style) {
@@ -223,13 +225,48 @@ class KPIComponent extends Component {
             this.chart.reflow();
         }
 
-        const color = this.getValueColor();
-        if (color) {
-            this.value.style.color = color;
-        }
+        this.value.style.color = this.getValueColor();
     }
 
-    private getValueColor(): (string|undefined) {
+    private getSubtitle(): string {
+        const {
+            subtitle,
+            value
+        } = this.options;
+
+        if (typeof subtitle === 'string') {
+            return subtitle;
+        }
+
+        if (subtitle) {
+            if (isNumber(this.prevValue) && isNumber(value)) {
+                const diff = value - this.prevValue;
+                let prefix = '';
+
+                if (diff > 0) {
+                    prefix = '<span style="color:green">&#9650;</span> +';
+                } else if (diff < 0) {
+                    prefix = '<span style="color:red">&#9660;</span> ';
+                } else {
+                    return this.subtitle.innerHTML;
+                }
+
+                if (subtitle.type === 'diff') {
+                    return prefix + diff.toLocaleString();
+                }
+                if (subtitle.type === 'diffpercent') {
+                    return prefix + format('{v:,.2f}%', {
+                        v: diff / this.prevValue * 100
+                    });
+                }
+            } else {
+                return subtitle.text || '';
+            }
+        }
+        return '';
+    }
+
+    private getValueColor(): string {
         const {
             threshold,
             thresholdColors,
@@ -251,6 +288,7 @@ class KPIComponent extends Component {
             }
             return thresholdColors[0];
         }
+        return '';
     }
 }
 
@@ -264,10 +302,17 @@ namespace KPIComponent {
         thresholdColors?: Array<string>;
         title?: string;
         value?: number|string;
-        subtitle?: string;
+        subtitle?: string|SubtitleOptions;
         valueFormat?: string;
         valueFormatter?: ValueFormatterCallbackFunction;
     }
+
+    export interface SubtitleOptions {
+        type?: SubtitleType;
+        text?: string;
+    }
+
+    export type SubtitleType = 'text' | 'diff' | 'diffpercent';
 
     export interface ValueFormatterCallbackFunction {
         (

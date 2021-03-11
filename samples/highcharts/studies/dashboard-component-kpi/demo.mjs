@@ -53,7 +53,9 @@ const kpi = [{
 }, {
     title: 'Pie',
     value: 911,
-    subtitle: 'Totally'
+    subtitle: {
+        type: 'diff'
+    }
 }, {
     title: 'Stuff',
     value: 1881,
@@ -73,7 +75,10 @@ const kpi = [{
 }, {
     title: 'Cash',
     value: 88,
-    valueFormat: '${value:,.2f}'
+    valueFormat: '${value:,.2f}',
+    subtitle: {
+        type: 'diffpercent'
+    }
 }, {
     title: 'Progress',
     chart: {

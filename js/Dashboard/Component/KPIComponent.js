@@ -89,12 +89,14 @@ var KPIComponent = /** @class */ (function (_super) {
         return this;
     };
     KPIComponent.prototype.updateElements = function () {
-        var _a = this.options, style = _a.style, subtitle = _a.subtitle, title = _a.title, valueFormat = _a.valueFormat, valueFormatter = _a.valueFormatter;
+        var _a = this.options, style = _a.style, title = _a.title, valueFormat = _a.valueFormat, valueFormatter = _a.valueFormatter;
         var value = this.options.value;
-        if (defined(title)) {
-            AST.setElementHTML(this.title, title);
-        }
+        AST.setElementHTML(this.title, title || '');
         if (defined(value)) {
+            var prevValue = void 0;
+            if (isNumber(value)) {
+                prevValue = value;
+            }
             if (valueFormatter) {
                 value = valueFormatter.call(this, value);
             }
@@ -105,13 +107,12 @@ var KPIComponent = /** @class */ (function (_super) {
                 value = value.toLocaleString();
             }
             AST.setElementHTML(this.value, value);
+            AST.setElementHTML(this.subtitle, this.getSubtitle());
+            this.prevValue = prevValue;
             this.valueWrap.style.flex = '1';
         }
         else {
             this.valueWrap.style.flex = '0';
-        }
-        if (defined(subtitle)) {
-            AST.setElementHTML(this.subtitle, subtitle);
         }
         if (style) {
             css(this.element, style);
@@ -122,10 +123,40 @@ var KPIComponent = /** @class */ (function (_super) {
         if (this.chart) {
             this.chart.reflow();
         }
-        var color = this.getValueColor();
-        if (color) {
-            this.value.style.color = color;
+        this.value.style.color = this.getValueColor();
+    };
+    KPIComponent.prototype.getSubtitle = function () {
+        var _a = this.options, subtitle = _a.subtitle, value = _a.value;
+        if (typeof subtitle === 'string') {
+            return subtitle;
         }
+        if (subtitle) {
+            if (isNumber(this.prevValue) && isNumber(value)) {
+                var diff = value - this.prevValue;
+                var prefix = '';
+                if (diff > 0) {
+                    prefix = '<span style="color:green">&#9650;</span> +';
+                }
+                else if (diff < 0) {
+                    prefix = '<span style="color:red">&#9660;</span> ';
+                }
+                else {
+                    return this.subtitle.innerHTML;
+                }
+                if (subtitle.type === 'diff') {
+                    return prefix + diff.toLocaleString();
+                }
+                if (subtitle.type === 'diffpercent') {
+                    return prefix + format('{v:,.2f}%', {
+                        v: diff / this.prevValue * 100
+                    });
+                }
+            }
+            else {
+                return subtitle.text || '';
+            }
+        }
+        return '';
     };
     KPIComponent.prototype.getValueColor = function () {
         var _a = this.options, threshold = _a.threshold, thresholdColors = _a.thresholdColors, value = _a.value;
@@ -145,6 +176,7 @@ var KPIComponent = /** @class */ (function (_super) {
             }
             return thresholdColors[0];
         }
+        return '';
     };
     KPIComponent.defaultOptions = merge(Component.defaultOptions, {
         className: [
