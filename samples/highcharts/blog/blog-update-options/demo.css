@@ -117,6 +117,7 @@ input[type="range"]{
 .max,.min{
   font-size: 12px;
 }
+
 #thing{
   font-weight:bold;
 }
