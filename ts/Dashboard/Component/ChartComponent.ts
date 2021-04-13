@@ -1,11 +1,17 @@
-import type CSSObject from '../../Core/Renderer/CSSObject';
 import Chart from '../../Core/Chart/Chart.js';
 import Component from './Component.js';
 import DataSeriesConverter from '../../Data/DataSeriesConverter.js';
 import DataStore from '../../Data/Stores/DataStore.js';
 import DataJSON from '../../Data/DataJSON.js';
+import DataParser from '../../Data/Parsers/DataParser.js';
 
-import H from '../../Core/Globals.js';
+import Highcharts from '../../masters/highcharts.src.js';
+import {
+    ChartSyncHandler,
+    ChartSyncEmitter,
+    defaults as defaultHandlers
+} from './ChartSyncHandlers.js';
+
 import U from '../../Core/Utilities.js';
 const {
     createElement,
@@ -26,6 +32,9 @@ class ChartComponent extends Component<ChartComponent.Event> {
      *  Static properties
      *
      * */
+
+    public static syncHandlers = defaultHandlers;
+
     public static defaultOptions = merge(
         Component.defaultOptions,
         {
@@ -34,8 +43,16 @@ class ChartComponent extends Component<ChartComponent.Event> {
             chartOptions: {
                 series: []
             },
-            Highcharts: H,
-            chartConstructor: ''
+            Highcharts,
+            chartConstructor: '',
+            syncEvents: [],
+            syncHandlers: ChartComponent.syncHandlers,
+            editableOptions: [
+                ...Component.defaultOptions.editableOptions,
+                'chartOptions',
+                'chartClassName',
+                'chartID'
+            ]
         });
 
     public static fromJSON(json: ChartComponent.ClassJSON): ChartComponent {
@@ -49,7 +66,8 @@ class ChartComponent extends Component<ChartComponent.Event> {
                 {
                     chartOptions,
                     Highcharts, // TODO: Find a solution
-                    store: store instanceof DataStore ? store : void 0
+                    store: store instanceof DataStore ? store : void 0,
+                    syncHandlers: ChartComponent.syncHandlers // Get from static registry
                 }
             )
         );
@@ -64,12 +82,16 @@ class ChartComponent extends Component<ChartComponent.Event> {
      * */
 
     public chartOptions: Highcharts.Options;
-    public chart?: Chart;
+    public chart: Chart;
     public chartContainer: HTMLElement;
     public options: ChartComponent.ComponentOptions;
-    public charter: typeof H;
+    public charter: typeof Highcharts;
     public chartConstructor: ChartComponent.constructorType;
+    public syncEvents: ChartComponent.syncEventsType[];
+    public syncHandlers: Record<string, ChartComponent.syncHandlersType>;
+    public editableOptions: Array<keyof ChartComponent.EditableOptions>;
 
+    private syncHandlerRegistry: Record<string, ChartSyncHandler>
     /* *
      *
      *  Constructor
@@ -87,6 +109,7 @@ class ChartComponent extends Component<ChartComponent.Event> {
         this.charter = this.options.Highcharts;
         this.chartConstructor = this.options.chartConstructor;
         this.type = 'chart';
+        this.editableOptions = this.options.editableOptions;
 
         this.chartContainer = createElement(
             'figure',
@@ -102,8 +125,11 @@ class ChartComponent extends Component<ChartComponent.Event> {
             this.chartContainer.id = this.options.chartID;
         }
 
-        this.chartOptions = this.options.chartOptions || {};
-
+        this.syncEvents = this.options.syncEvents;
+        this.syncHandlers = this.options.syncHandlers;
+        this.syncHandlerRegistry = {};
+        this.chartOptions = this.options.chartOptions || { chart: {} };
+        this.chart = this.constructChart();
         // Extend via event.
         this.on('resize', (e: Component.ResizeEvent): void => {
             if (this.chart) {
@@ -173,16 +199,75 @@ class ChartComponent extends Component<ChartComponent.Event> {
         }
     }
 
-    private initChart(): void {
-        const series = new DataSeriesConverter(this.store?.table, {});
-        this.chartOptions.series = this.chartOptions.series ?
-            [...series.getAllSeriesData(), ...this.chartOptions.series] :
-            series.getAllSeriesData();
-        this.constructChart();
+    public registerSyncHandler(handler: ChartSyncHandler): void {
+        const { id } = handler;
+        this.syncHandlerRegistry[id] = handler;
+    }
 
-        if (this.chart) {
-            const { width, height } = this.dimensions;
-            this.chart.setSize(width, height, false);
+    public getSyncHandler(handlerID: string): ChartSyncHandler | undefined {
+        return this.syncHandlerRegistry[handlerID];
+    }
+
+    private initChart(): void {
+        // @todo: This should be replaced when series understand dataTable
+        const seriesFromStore: any = [];
+        if (this.store?.table) {
+            const data = DataParser.getColumnsFromTable(this.store?.table, false).slice(1);
+            const keys = this.store.table.getColumnNames();
+            data.forEach((datum, i): void => {
+                let id, name;
+                if (keys && keys[i]) {
+                    id = keys[i];
+                    name = id;
+                }
+                seriesFromStore.push({ id, name, data: datum });
+            });
+
+        }
+
+        if (
+            !this.chartOptions.series ||
+            this.chartOptions.series.length < seriesFromStore.length
+        ) {
+            this.chartOptions.series = [
+                ...seriesFromStore,
+                ...(this.options.chartOptions?.series || [])
+            ];
+        }
+
+        this.chart = this.constructChart();
+
+        const { width, height } = this.dimensions;
+        this.chart.setSize(width, height);
+
+        this.setupSync();
+    }
+
+    private setupSync(): void {
+        if (this.store?.table.getPresentationState()) {
+            Object.keys(this.syncHandlers).forEach((id: string): void => {
+                if (this.syncEvents.indexOf(id as ChartComponent.syncEventsType) > -1) {
+                    const { emitter, handler } = this.syncHandlers[id];
+                    if (handler instanceof ChartSyncHandler) {
+                        // Avoid registering the same handler multiple times
+                        // i.e. panning and selection uses the same handler
+                        const existingHandler = this.getSyncHandler(handler.id);
+                        if (!existingHandler) {
+                            this.registerSyncHandler(handler);
+                            handler.createHandler(this)();
+                        }
+                    } else if (typeof handler === 'function') {
+                        handler(this);
+                    }
+
+                    // Probably should register this also
+                    if (emitter instanceof ChartSyncEmitter) {
+                        emitter.createEmitter(this)();
+                    } else if (emitter instanceof Function) {
+                        emitter(this);
+                    }
+                }
+            });
         }
     }
 
@@ -208,7 +293,8 @@ class ChartComponent extends Component<ChartComponent.Event> {
             throw new Error('Chart constructor not found');
         }
 
-        this.chart = this.charter.chart(this.chartContainer, this.chartOptions);
+        this.charter.chart(this.chartContainer, this.chartOptions);
+
         return this.chart;
     }
 
@@ -224,7 +310,8 @@ class ChartComponent extends Component<ChartComponent.Event> {
                 ...base.options,
                 chartOptions,
                 Highcharts: Highcharts.product,
-                chartConstructor
+                chartConstructor,
+                syncEvents: this.syncEvents
             }
         };
     }
@@ -240,29 +327,37 @@ namespace ChartComponent {
     export type ComponentType = ChartComponent;
 
     export type constructorType = 'chart' | 'stock' | 'map' | 'gantt';
+
+    export type syncEventsType = 'visibility'| 'selection' | 'tooltip' | 'panning';
+    export type syncHandlersType = { emitter: Function | ChartSyncEmitter; handler: Function | ChartSyncHandler };
+
     export interface Event extends Component.Event {
     }
     export interface UpdateEvent extends Component.UpdateEvent {
         options?: ComponentOptions;
     }
-    export interface ComponentOptions extends Component.ComponentOptions {
+    export interface ComponentOptions extends Component.ComponentOptions, EditableOptions {
+        Highcharts: typeof Highcharts;
+        chartConstructor: ChartComponent.constructorType;
+        syncEvents: syncEventsType[];
+        syncHandlers: Record<syncEventsType, syncHandlersType>;
+    }
+
+    export interface EditableOptions extends Component.EditableOptions {
         chartOptions?: Highcharts.Options;
         chartClassName?: string;
         chartID?: string;
-        style?: CSSObject;
-        Highcharts: typeof H;
-        chartConstructor: ChartComponent.constructorType;
     }
-
 
     export interface ComponentJSONOptions extends Component.ComponentJSONOptions {
         chartOptions?: string;
         chartClassName?: string;
         chartID?: string;
-        style?: CSSObject;
         Highcharts: string; // reference?
         chartConstructor: ChartComponent.constructorType;
+        syncEvents: syncEventsType[];
     }
+
 
     export interface ClassJSON extends Component.ClassJSON {
         options: ChartComponent.ComponentJSONOptions;

@@ -122,10 +122,9 @@ class KPIComponent extends Component {
 
         this.updateElements();
 
-        this.element.style.width = this.dimensions.width + 'px';
-        this.element.style.height = this.dimensions.height + 'px';
-
-        this.updateSize(this.dimensions.width, this.dimensions.height);
+        if (this.dimensions.width && this.dimensions.height) {
+            this.updateSize(this.dimensions.width, this.dimensions.height);
+        }
 
         return this;
     }
@@ -188,7 +187,14 @@ class KPIComponent extends Component {
 
         let value = this.options.value;
 
-        AST.setElementHTML(this.title, title || '');
+        if (typeof title === 'object') {
+            AST.setElementHTML(this.title, title.text || '');
+            if (title.style) {
+                css(this.title, title.style);
+            }
+        } else {
+            AST.setElementHTML(this.title, title || '');
+        }
 
         if (defined(value)) {
             let prevValue;
@@ -217,9 +223,7 @@ class KPIComponent extends Component {
             css(this.element, style);
         }
 
-        css(this.chartContainer, {
-            flex: this.options.chart ? 1 : 0
-        });
+        this.chartContainer.style.flex = this.options.chart ? '1' : '0';
 
         if (this.chart) {
             this.chart.reflow();
@@ -300,7 +304,6 @@ namespace KPIComponent {
         style?: CSSObject;
         threshold?: number|Array<number>;
         thresholdColors?: Array<string>;
-        title?: string;
         value?: number|string;
         subtitle?: string|SubtitleOptions;
         valueFormat?: string;

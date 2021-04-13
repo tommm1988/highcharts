@@ -30,6 +30,7 @@ const {
 declare module '../../Core/Chart/ChartLike'{
     interface ChartLike {
         didBoost?: boolean;
+        isBoosting?: boolean;
         markerGroup?: Series['markerGroup'];
     }
 }
@@ -224,6 +225,10 @@ function init(): void {
                     chartDestroyed = typeof chart.index === 'undefined',
                     isYInside = true;
 
+                if (typeof d === 'undefined') {
+                    return true;
+                }
+
                 if (!chartDestroyed) {
                     if (useRaw) {
                         x = (d as any)[0];
@@ -390,6 +395,8 @@ function init(): void {
         fill: true,
         sampling: true
     });
+
+    Chart.prototype.propsRequireUpdateSeries.push('boost');
 
     // Take care of the canvas blitting
     Chart.prototype.callbacks.push(function (

@@ -13,31 +13,31 @@ body {
     flex-basis: 100vw;
 }
 
-.highcharts-dashboard-component-kpi {
+.hcd-component-kpi {
     box-shadow: 0px 5px 20px 3px rgba(0,0,0,0.1);
     margin: 0.5em;
 }
 
-.highcharts-dashboard-component-kpi-title {
+.hcd-component-kpi-title {
     padding-top: 0.5em;
 }
 
-.highcharts-dashboard-component-kpi-value-wrap {
+.hcd-component-kpi-value-wrap {
     flex: 1;
     display: flex;
     flex-direction: column;
     justify-content: center;
 }
 
-.highcharts-dashboard-component-kpi-value {
+.hcd-component-kpi-value {
     font-weight: 700;
 }
 
-.highcharts-dashboard-component-kpi-subtitle {
+.hcd-component-kpi-subtitle {
     margin-top: 0.25em;
 }
 
-.highcharts-dashboard-component-kpi-chart-container {
+.hcd-component-kpi-chart-container {
     flex: 1;
     margin: 0;
 }

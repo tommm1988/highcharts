@@ -17,11 +17,13 @@
  * */
 
 import type DataEventEmitter from './DataEventEmitter';
-import DataJSON from './DataJSON.js';
+import type DataJSON from './DataJSON.js';
+import type PointType from '../Core/Series/PointType';
 import U from '../Core/Utilities.js';
 const {
     addEvent,
-    fireEvent
+    fireEvent,
+    merge
 } = U;
 
 /* *
@@ -32,7 +34,7 @@ const {
 
 /**
  * Contains presentation information like column order, usually in relation to a
- * DataTable instance.
+ * table instance.
  */
 class DataPresentationState implements DataEventEmitter<DataPresentationState.EventObject>, DataJSON.Class {
 
@@ -50,8 +52,18 @@ class DataPresentationState implements DataEventEmitter<DataPresentationState.Ev
     ): DataPresentationState {
         const presentationState = new DataPresentationState();
 
-        if (json.columnOrder) {
-            presentationState.setColumnOrder(json.columnOrder);
+        const { columnOrder, visibilityMap, selection, hoverpoint } = json;
+        if (columnOrder) {
+            presentationState.setColumnOrder(columnOrder);
+        }
+        if (visibilityMap) {
+            presentationState.setColumnVisibility(visibilityMap);
+        }
+        if (selection) {
+            presentationState.setSelection(selection);
+        }
+        if (hoverpoint) {
+            presentationState.setHoverPoint(hoverpoint);
         }
 
         return presentationState;
@@ -67,6 +79,12 @@ class DataPresentationState implements DataEventEmitter<DataPresentationState.Ev
      * Sorted array of column names.
      */
     private columnOrder?: Array<string>;
+
+    private columnVisibilityMap: Record<string, boolean> = {};
+
+    private hoverPoint?: DataPresentationState.PresentationHoverPointType;
+
+    private selection: Record<string, { min?: number; max?: number }> = {};
 
     /**
      * Whether the state has been changed since initialization.
@@ -98,6 +116,10 @@ class DataPresentationState implements DataEventEmitter<DataPresentationState.Ev
      */
     public getColumnOrder(): Array<string> {
         return (this.columnOrder || []).slice();
+    }
+
+    public getColumnVisibility(columnName: string): boolean | undefined {
+        return this.columnVisibilityMap[columnName];
     }
 
     /**
@@ -162,7 +184,7 @@ class DataPresentationState implements DataEventEmitter<DataPresentationState.Ev
     }
 
     /**
-     * Sets the order of the columns.
+     * Sets the order of the columns in place.
      *
      * @param {Array<string>} columnOrder
      * Array of column names in order.
@@ -196,6 +218,54 @@ class DataPresentationState implements DataEventEmitter<DataPresentationState.Ev
         });
     }
 
+    public setColumnVisibility(columnVisibility: Record<string, boolean>, eventDetail?: {}): void {
+        this.columnVisibilityMap = merge(
+            this.columnVisibilityMap,
+            columnVisibility
+        );
+        this.emit({
+            type: 'afterColumnVisibilityChange',
+            visibilityMap: this.columnVisibilityMap,
+            detail: eventDetail
+        });
+    }
+
+    public setHoverPoint(point: DataPresentationState.PresentationHoverPointType | undefined, eventDetail?: {}): void {
+        this.hoverPoint = point;
+        this.emit({
+            type: 'afterHoverPointChange',
+            hoverPoint: this.hoverPoint,
+            detail: eventDetail
+        });
+    }
+
+    public getHoverPoint(): DataPresentationState.PresentationHoverPointType | undefined {
+        return this.hoverPoint;
+    }
+
+    public getSelection(): DataPresentationState.selectionObjectType {
+        return this.selection;
+    }
+
+    public setSelection(
+        selection: Record<string, { min?: number; max?: number }>,
+        reset = false,
+        eventDetail?: {}
+    ): void {
+        const axes = Object.keys(selection);
+
+        axes.forEach((axisID): void => {
+            this.selection[axisID] = selection[axisID];
+        });
+
+        this.emit({
+            type: 'afterSelectionChange',
+            selection: this.selection,
+            reset,
+            detail: eventDetail
+        });
+    }
+
     /**
      * Converts the presentation state to a class JSON.
      *
@@ -209,6 +279,16 @@ class DataPresentationState implements DataEventEmitter<DataPresentationState.Ev
 
         if (this.columnOrder) {
             json.columnOrder = this.columnOrder.slice();
+        }
+        if (this.hoverPoint) {
+            const { x, y, id } = this.hoverPoint;
+            json.hoverPoint = { x, y, id };
+        }
+        if (this.selection) {
+            json.selection = this.selection;
+        }
+        if (this.columnVisibilityMap) {
+            json.columnVisibility = this.columnVisibilityMap;
         }
 
         return json;
@@ -238,6 +318,9 @@ namespace DataPresentationState {
      */
     export interface ClassJSON extends DataJSON.ClassJSON {
         columnOrder?: Array<string>;
+        visibilityMap?: columnVisibilityType;
+        hoverpoint?: { x: number; y: number; id: string };
+        selection?: selectionObjectType;
     }
 
     /**
@@ -246,6 +329,19 @@ namespace DataPresentationState {
     export type ColumnOrderEventType = (
         'columnOrderChange'|'afterColumnOrderChange'
     );
+    export type ColumnVisibilityEventType = (
+        'columnVisibilityChange' | 'afterColumnVisibilityChange'
+    )
+
+    export type HoverPointEventType = (
+        'hoverPointChange' | 'afterHoverPointChange'
+    )
+
+    export type selectionEventType = (
+        'selectionChange' | 'afterSelectionChange'
+    )
+
+    export type eventTypes = (selectionEventType | HoverPointEventType | ColumnVisibilityEventType)
 
     /**
      * Function to sort an array of column names.
@@ -257,7 +353,10 @@ namespace DataPresentationState {
     /**
      * All information objects of DataPrsentationState events.
      */
-    export type EventObject = (ColumnOrderEventObject);
+    export type EventObject = (
+        ColumnOrderEventObject | ColumnVisibilityEventObject |
+        PointHoverEventObject | SelectionEventObject
+    );
 
     /**
      * Describes the information object for order-related events.
@@ -266,6 +365,27 @@ namespace DataPresentationState {
         type: ColumnOrderEventType;
         newColumnOrder: Array<string>;
         oldColumnOrder: Array<string>;
+    }
+    export interface ColumnVisibilityEventObject extends DataEventEmitter.EventObject {
+        type: ColumnVisibilityEventType;
+        visibilityMap: Record<string, boolean>;
+    }
+
+    export interface PointHoverEventObject extends DataEventEmitter.EventObject {
+        type: HoverPointEventType;
+        hoverPoint: PresentationHoverPointType | undefined;
+    }
+
+    export type columnVisibilityType = Record<string, boolean>;
+
+    export type selectionObjectType = Record<string, { min?: number; max?: number }>;
+
+    export type PresentationHoverPointType = Partial<PointType>;
+
+    export interface SelectionEventObject extends DataEventEmitter.EventObject {
+        type: selectionEventType;
+        selection: Record<string, {min?: number | undefined; max?: number | undefined}>;
+        reset: boolean;
     }
 
 }

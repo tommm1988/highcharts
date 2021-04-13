@@ -199,12 +199,14 @@ function isSkipSeries(
 function isSkipPoint(
     point: Highcharts.AccessibilityPoint
 ): (boolean|number|undefined) {
-    var a11yOptions = point.series.chart.options.accessibility;
+    const a11yOptions = point.series.chart.options.accessibility;
+    const pointA11yDisabled = point.options.accessibility?.enabled === false;
 
     return point.isNull &&
         a11yOptions.keyboardNavigation.seriesNavigation.skipNullPoints ||
         point.visible === false ||
         point.isInside === false ||
+        pointA11yDisabled ||
         isSkipSeries(point.series);
 }
 
@@ -725,9 +727,8 @@ extend(SeriesKeyboardNavigation.prototype, /** @lends Highcharts.SeriesKeyboardN
                     ): number {
                         const point = chart.highlightedPoint;
                         if (point) {
-                            fireEvent(point.series, 'click', extend(event, {
-                                point
-                            }));
+                            (event as any).point = point;
+                            fireEvent(point.series, 'click', event);
                             point.firePointEvent('click');
                         }
                         return this.response.success;

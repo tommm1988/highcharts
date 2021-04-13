@@ -11,6 +11,7 @@
 import type {
     DOMElementType
 } from '../DOMElementType';
+import type SVGAttributes from '../SVG/SVGAttributes';
 
 import H from '../../Globals.js';
 import U from '../../Utilities.js';
@@ -22,6 +23,7 @@ const {
 
 const {
     attr,
+    erase,
     isString,
     objectEach,
     pick
@@ -183,9 +185,9 @@ class TextBuilder {
                         // Since the break is inserted in front of the next
                         // line, we need to use the next sibling for the line
                         // height
-                        dy: this.getLineHeight(br.nextSibling as any),
+                        dy: this.getLineHeight(br.nextSibling as any) as any,
                         x
-                    });
+                    } as unknown as SVGAttributes);
                 }
             }
         );
@@ -295,7 +297,7 @@ class TextBuilder {
                     // Insert a break
                     const br = doc.createElementNS(SVG_NS, 'tspan') as SVGElement;
                     br.textContent = '\u200B'; // zero-width space
-                    attr(br, { dy, x });
+                    attr(br, { dy, x } as unknown as SVGAttributes);
                     parentElement.insertBefore(br, textNode);
                 });
 
@@ -424,6 +426,16 @@ class TextBuilder {
         };
 
         nodes.forEach(modifyChild);
+
+        // Remove empty spans from the beginning because SVG's getBBox doesn't
+        // count empty lines. The use case is tooltip where the header is empty.
+        while (nodes[0]) {
+            if (nodes[0].tagName === 'tspan' && !nodes[0].children) {
+                nodes.splice(0, 1);
+            } else {
+                break;
+            }
+        }
     }
 
     /*

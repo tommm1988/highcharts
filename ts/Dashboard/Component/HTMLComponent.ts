@@ -18,7 +18,12 @@ class HTMLComponent extends Component<HTMLComponent.HTMLComponentEventObject> {
     public static defaultOptions = merge(
         Component.defaultOptions,
         {
-            elements: []
+            scaleElements: true,
+            elements: [],
+            editableOptions: [
+                ...Component.defaultOptions.editableOptions,
+                'scaleElements'
+            ]
         }
     );
 
@@ -51,7 +56,9 @@ class HTMLComponent extends Component<HTMLComponent.HTMLComponentEventObject> {
 
     private innerElements: HTMLElement[];
     private elements: Highcharts.ASTNode[];
+    private scaleElements: boolean;
     public options: HTMLComponent.HTMLComponentOptions;
+    public editableOptions: Array<keyof HTMLComponent.EditableOptions>;
 
     /* *
      *
@@ -71,6 +78,8 @@ class HTMLComponent extends Component<HTMLComponent.HTMLComponentEventObject> {
         this.type = 'HTML';
         this.innerElements = [];
         this.elements = [];
+        this.scaleElements = this.options.scaleElements;
+        this.editableOptions = this.options.editableOptions;
 
         this.on('tableChanged', (e: Component.TableChangedEvent): void => {
             if (e.detail?.sender !== this.id) {
@@ -86,17 +95,86 @@ class HTMLComponent extends Component<HTMLComponent.HTMLComponentEventObject> {
      *
      * */
 
+    public createTextElement(
+        tagName: string,
+        elementName: string,
+        textOptions: Component.textOptionsType
+    ): HTMLElement | undefined {
+        const classBase = 'hcd';
+
+        if (typeof textOptions === 'object') {
+            const { className, text, style } = textOptions;
+            return createElement(tagName, {
+                className: className || `${classBase}-component-${elementName}`,
+                textContent: text
+            }, style);
+        }
+
+        if (typeof textOptions === 'string') {
+            return createElement(tagName, {
+                className: `${classBase}-component-${elementName}`,
+                textContent: textOptions
+            });
+        }
+    }
+
+    public setTitle(titleOptions: Component.textOptionsType): void {
+        const titleElement = this.createTextElement('h1', 'title', titleOptions);
+        if (titleElement) {
+            this.innerElements = [titleElement, ...this.innerElements];
+        }
+    }
+
+    public setCaption(captionOptions: Component.textOptionsType): void {
+        const captionElement = this.createTextElement('div', 'caption', captionOptions);
+        if (captionElement) {
+            this.innerElements = [captionElement, ...this.innerElements];
+        }
+    }
+
     public load(): this {
         this.emit({ type: 'load' });
         super.load();
         this.elements = this.options.elements || [];
+
         this.constructTree();
+
+        this.setTitle(this.options.title);
+        this.setCaption(this.options.caption);
+
         this.innerElements.forEach((element): void => {
             this.element.appendChild(element);
         });
         this.parentElement.appendChild(this.element);
+        if (this.scaleElements) {
+            this.autoScale();
+        }
         this.emit({ type: 'afterLoad' });
         return this;
+    }
+
+    // WIP handle scaling inner elements
+    // Could probably also implement responsive config
+    public autoScale(): void {
+        this.element.style.display = 'flex';
+        this.element.style.flexDirection = 'column';
+
+        this.innerElements.forEach((element): void => {
+            element.style.width = 'auto';
+            element.style.maxWidth = '100%';
+            element.style.maxHeight = '100%';
+            element.style.flexBasis = 'auto'; // (100 / this.innerElements.length) + '%';
+            element.style.overflow = 'auto';
+        });
+        this.scaleText();
+    }
+
+    // WIP basic font size scaling
+    // Should also take height into account
+    public scaleText(): void {
+        this.innerElements.forEach((element): void => {
+            element.style.fontSize = Math.max(Math.min(element.clientWidth / (1 * 10), 200), 20) + 'px';
+        });
     }
 
     public render(): this {
@@ -121,6 +199,17 @@ class HTMLComponent extends Component<HTMLComponent.HTMLComponentEventObject> {
 
         this.render();
         this.emit({ type: 'afterRedraw', component: this });
+        return this;
+    }
+
+    public resize(
+        width?: number | string | null,
+        height?: number | string | null
+    ): this {
+        if (this.scaleElements) {
+            this.scaleText();
+        }
+        super.resize(width, height);
         return this;
     }
 
@@ -170,12 +259,17 @@ class HTMLComponent extends Component<HTMLComponent.HTMLComponentEventObject> {
 namespace HTMLComponent {
 
     export type ComponentType = HTMLComponent;
-    export interface HTMLComponentOptions extends Component.ComponentOptions {
+    export interface HTMLComponentOptions extends Component.ComponentOptions, EditableOptions {
         elements?: Highcharts.ASTNode[];
+    }
+
+    export interface EditableOptions extends Component.EditableOptions {
+        scaleElements: boolean;
     }
 
     export interface HTMLComponentJSONOptions extends Component.ComponentJSONOptions {
         elements: DataJSON.JSONObject[];
+        scaleElements: boolean;
     }
 
     export interface HTMLComponentEventObject extends Component.Event {

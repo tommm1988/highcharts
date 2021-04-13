@@ -2,6 +2,8 @@ import type ComponentType from './ComponentType';
 import type DataEventEmitter from '../../Data/DataEventEmitter';
 import type DataStore from '../../Data/Stores/DataStore';
 import type DataJSON from '../../Data/DataJSON';
+import type CSSObject from '../../Core/Renderer/CSSObject';
+import type TextOptions from './TextOptions';
 import U from '../../Core/Utilities.js';
 const {
     createElement,
@@ -11,7 +13,8 @@ const {
     objectEach,
     isFunction,
     uniqueKey,
-    getStyle
+    getStyle,
+    relativeLength
 } = U;
 
 abstract class Component<TEventObject extends Component.Event = Component.Event> {
@@ -146,16 +149,26 @@ abstract class Component<TEventObject extends Component.Event = Component.Event>
     }
 
     public static defaultOptions: Component.ComponentOptions = {
-        className: 'highcharts-dashboard-component',
+        className: 'hcd-component',
         parentElement: document.body,
         type: '',
-        id: ''
+        id: '',
+        title: false,
+        caption: false,
+        editableOptions: [
+            'dimensions',
+            'id',
+            'store',
+            'style'
+        ]
     }
 
     public parentElement: HTMLElement;
     public store?: DataStore<any>; // the attached store
-    public readonly dimensions: { width: number; height: number };
+    public dimensions: { width: number | null; height: number | null };
     public element: HTMLElement;
+    public titleElement?: HTMLElement;
+    public captionElement?: HTMLElement;
     public options: Component.ComponentOptions;
     public type: string;
     public id: string;
@@ -185,8 +198,8 @@ abstract class Component<TEventObject extends Component.Event = Component.Event>
         this.hasLoaded = false;
         // Initial dimensions
         this.dimensions = {
-            width: Number(getStyle(this.parentElement, 'width')),
-            height: Number(getStyle(this.parentElement, 'height'))
+            width: null,
+            height: null
         };
 
         this.element = createElement('div', {
@@ -243,45 +256,55 @@ abstract class Component<TEventObject extends Component.Event = Component.Event>
         return this;
     }
 
+    /**
+     * Resize the component
+     * @param {number|string|null} [width]
+     * The width to set the component to.
+     * Can be pixels, a percentage string or null.
+     * Null will unset the style
+     * @param {number|string|null} [height]
+     * The height to set the component to.
+     * Can be pixels, a percentage string or null.
+     * Null will unset the style
+     *
+     * @return {this} this
+     */
     public resize(
-        width: number | string = this.dimensions.width,
-        height: number | string = this.dimensions.height
+        width?: number | string | null,
+        height?: number | string | null
     ): this {
-        const percentageRegex = /\%$/;
-        const dimensions: Record<'width' | 'height', {
-            value: number; type: 'px' | '%';
-        }> = {
-            width: { value: 0, type: 'px' },
-            height: { value: 0, type: 'px' }
-        };
 
-        if (typeof width === 'string') {
-            if (width.match(percentageRegex)) {
-                dimensions.width.value = Number(width.replace(percentageRegex, ''));
-                dimensions.width.type = '%';
-            }
-            // Perhaps somewhat naive
-            dimensions.width.value = Number(width.replace('px', ''));
-        } else {
-            dimensions.width.value = width;
+        // If undefined, and parent has set style,
+        // set to parents height minus padding, margin, etc
+        if (height === void 0 && this.parentElement.style.height) {
+            height = '100%';
         }
 
-        if (typeof height === 'string') {
-            if (height.match(percentageRegex)) {
-                dimensions.height.value = Number(height.replace(percentageRegex, ''));
-                dimensions.height.type = '%';
-            }
-            // Perhaps somewhat naive
-            dimensions.height.value = Number(height.replace('px', ''));
-        } else {
-            dimensions.height.value = height;
+        if (width === void 0 && this.parentElement.style.width) {
+            width = '100%';
         }
 
-        this.dimensions.height = dimensions.height.value;
-        this.dimensions.width = dimensions.width.value;
+        if (height) {
+            // Get offset for border, padding, margin
+            const diff = this.element.offsetHeight - Number(getStyle(this.element, 'height'));
+            this.dimensions.height = relativeLength(height, Number(getStyle(this.parentElement, 'height')), -diff);
+            this.element.style.height = this.dimensions.height + 'px';
+        }
+        if (width) {
+            const diff = this.element.offsetWidth - Number(getStyle(this.element, 'width'));
+            this.dimensions.width = relativeLength(width, Number(getStyle(this.parentElement, 'width')), -diff);
+            this.element.style.width = this.dimensions.width + 'px';
+        }
 
-        this.element.style.width = dimensions.width.value + dimensions.width.type;
-        this.element.style.height = dimensions.height.value + dimensions.height.type;
+        if (height === null) {
+            this.dimensions.height = null;
+            this.element.style.removeProperty('height');
+        }
+
+        if (width === null) {
+            this.dimensions.width = null;
+            this.element.style.removeProperty('width');
+        }
 
         fireEvent(this, 'resize', {
             width,
@@ -351,7 +374,10 @@ abstract class Component<TEventObject extends Component.Event = Component.Event>
         if (!this.hasLoaded) {
             this.load();
             // Call resize to set the sizes
-            this.resize(this.options.dimensions?.width, this.options.dimensions?.height);
+            this.resize(
+                this.options.dimensions?.width,
+                this.options.dimensions?.height
+            );
         }
 
         const e = {
@@ -412,12 +438,22 @@ abstract class Component<TEventObject extends Component.Event = Component.Event>
      * Class JSON of this Component instance.
      */
     public toJSON(): Component.ClassJSON {
+        const dimensions: Record<'width' | 'height', number> = {
+            width: 0,
+            height: 0
+        };
+        objectEach(this.dimensions, function (value, key): void {
+            if (value === null) {
+                return;
+            }
+            dimensions[key] = value;
+        });
         return {
             $class: Component.getName(this.constructor),
             store: this.store?.toJSON(),
             options: {
                 parentElement: this.parentElement.id,
-                dimensions: this.dimensions,
+                dimensions,
                 type: this.options.type,
                 id: this.options.id || this.id
             }
@@ -466,22 +502,32 @@ namespace Component {
         component?: Component<any>;
     }
 
-    export interface ComponentOptions {
+    export interface ComponentOptions extends EditableOptions {
         parentElement: HTMLElement | string;
-        store?: DataStore<any>;
-        dimensions?: { width?: number | string; height?: number | string };
         className?: string;
         type: string;
         // allow overwriting gui elements
         navigationBindings?: Highcharts.NavigationBindingsOptionsObject[];
         events?: Record<Event['type'], Function>;
-        id?: string;
+        editableOptions: Array<keyof EditableOptions>;
     }
+
+    export interface EditableOptions {
+        dimensions?: { width?: number | string; height?: number | string };
+        store?: DataStore<any>;
+        id?: string;
+        style?: CSSObject;
+        title: textOptionsType;
+        caption: textOptionsType;
+    }
+
+    export type textOptionsType = string | false | TextOptions | undefined;
 
     // JSON compatible options for exprot
     export interface ComponentJSONOptions extends DataJSON.JSONObject {
         store?: DataStore.ClassJSON; // store id
         parentElement: string; // ID?
+        style?: {};
         dimensions?: { width: number; height: number };
         className?: string;
         type: string;

@@ -9,7 +9,7 @@ import Stock from '/base/js/masters/highstock.src.js';
 import Gantt from '/base/js/masters/highcharts-gantt.src.js';
 import Maps from '/base/js/masters/highmaps.src.js';
 
-const { test, only } = QUnit;
+const { test, only,skip } = QUnit;
 
 /** @type {Component.Event['type'][]} */
 const eventTypes = [
@@ -46,8 +46,10 @@ function registerEvents(component) {
     eventTypes.forEach(eventType => component.on(eventType, registerEvent))
 }
 
+
+
 test('ChartComponent events', function (assert) {
-    const parentElement = document.createElement('div');
+    const parentElement = document.getElementById('container');
     const store = new CSVStore(undefined, {
         csv: '1,2,3',
         firstRowAsNames: false
@@ -56,7 +58,7 @@ test('ChartComponent events', function (assert) {
     store.load();
 
     const component = new ChartComponent({
-        parentElement
+        parentElement: 'container'
     });
 
 
@@ -311,7 +313,7 @@ test('ChartComponent constructors', function (assert) {
     const constructorMap = {
         '': Highcharts,
         'stock': Stock,
-        'maps': Maps,
+        'map': Maps,
         'gantt': Gantt
     }
 
@@ -327,14 +329,12 @@ test('ChartComponent constructors', function (assert) {
     })
 });
 
-only('component resizing', function(assert) {
+test('component resizing', function(assert) {
 
     const parent = document.createElement('div');
     parent.id = 'test';
-    parent.style.width = '1000px';
-    parent.style.height = '500px';
 
-    document.body.appendChild(parent)
+    document.getElementById('container').appendChild(parent)
 
     const component = new HTMLComponent({
         parentElement: parent
@@ -345,10 +345,10 @@ only('component resizing', function(assert) {
             height: component.element.style.height
         },
         {
-            width: parent.style.width,
-            height: parent.style.height
+            width: "",
+            height: ""
         },
-        'Component with no dimensional options sets size to parent element'
+        'Component with no dimensional options should have no internal styles set'
     );
 
     component.resize(200)
@@ -359,7 +359,7 @@ only('component resizing', function(assert) {
         },
         {
             width: '200px',
-            height: parent.style.height
+            height: ""
         },
         'Should be able to update just the width'
     );
@@ -375,53 +375,95 @@ only('component resizing', function(assert) {
             width: '200px',
             height: '300px'
         },
+        'Should be able to update just the height. Width should stay the same.'
+    );
+
+    parent.style.width = '1000px';
+    parent.style.height = '200px';
+    component.resize('100%', '100%');
+    assert.deepEqual(
+        {
+            width: component.dimensions.width,
+            height: component.dimensions.height
+        },
+        {
+            width: 1000,
+            height: 200
+        },
         'Should be able to update just the height'
     );
 
     component.destroy();
 
     const widthComponent = new HTMLComponent({
-        parentElement: parent,
         dimensions: {
             width: '100'
         }
     }).render();
     assert.strictEqual(widthComponent.dimensions.width, 100)
-    assert.strictEqual(widthComponent.dimensions.height, parent.scrollHeight)
+    assert.strictEqual(widthComponent.dimensions.height, null)
 
     widthComponent.destroy()
 
     const heightComponent = new HTMLComponent({
-        parentElement: parent,
         dimensions: {
             height: '100'
         }
     }).render();
-    assert.strictEqual(heightComponent.dimensions.width, parent.scrollWidth)
+    assert.strictEqual(heightComponent.dimensions.width, null)
     assert.strictEqual(heightComponent.dimensions.height, 100)
 
     heightComponent.destroy()
 
     const emptyDimensions = new HTMLComponent({
-        parentElement: parent,
         dimensions: {}
-    }).render();
-    assert.strictEqual(emptyDimensions.dimensions.width, parent.scrollWidth)
-    assert.strictEqual(emptyDimensions.element.style.height, parent.style.height)
+   }).render();
+    assert.strictEqual(emptyDimensions.dimensions.width, null)
+    assert.strictEqual(emptyDimensions.element.style.height, "")
 
     emptyDimensions.destroy();
 
-    // const percentageDimensions = new HTMLComponent({
-    //     parentElement: parent,
-    //     dimensions: {
-    //         width: '50%',
-    //         height: '50%'
-    //     }
-    // }).render();
-    // assert.strictEqual(percentageDimensions.dimensions.width, parent.scrollWidth / 2)
-    // assert.strictEqual(percentageDimensions.dimensions.height, parent.scrollHeight / 2 )
-    //
-    // percentageDimensions.destroy();
+    const percentageDimensions = new HTMLComponent({
+        parentElement: parent,
+        dimensions: {
+            width: '50%',
+            height: '50%'
+        }
+    }).render();
+
+    let rect = percentageDimensions.element.getBoundingClientRect()
+    assert.strictEqual(rect.width, parent.scrollWidth / 2)
+    assert.strictEqual(rect.height, parent.scrollHeight / 2 )
 
 
+    // With padding
+    percentageDimensions.element.style.padding = '5px';
+    percentageDimensions.resize('50%', '50%')
+
+    rect = percentageDimensions.element.getBoundingClientRect()
+    assert.strictEqual(rect.width, parent.scrollWidth / 2)
+    assert.strictEqual(rect.height, parent.scrollHeight / 2)
+
+    percentageDimensions.destroy();
+
+
+});
+
+test('ChartComponent resizing', function(assert) {
+    const parent = document.createElement('div');
+    parent.id = 'test';
+    parent.style.width = '500px';
+    document.getElementById('container').appendChild(parent)
+
+    const component = new ChartComponent({
+        parentElement: parent,
+        chartOptions: {},
+        dimensions: {
+            height: '100%',
+            width: '100%'
+        }
+    }).render();
+
+    const { width, height } = component.element.style
+    assert.ok(true)
 })

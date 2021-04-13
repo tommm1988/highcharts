@@ -1,15 +1,5 @@
 docs/sidebars.js
-js/Accessibility/**/*.js
-js/Core/**/*.js
-js/Data/**/*.js
-js/Dashboard/**/*.js
-js/Extensions/**/*.js
-js/Gantt/**/*.js
-js/Maps/**/*.js
-js/Mixins/**/*.js
-js/Series/**/*.js
-js/Stock/**/*.js
-js/Themes/**/*.js
+js/**/*.js
 samples/data/**/*.js
 samples/highcharts/common-js/**/*.js
 samples/highcharts/esm/async-await/demo.js
@@ -20,6 +10,7 @@ test/test-controller.js
 test/test-template.js
 test/test-utilities.js
 test/typescript-karma
+test/cypress
 tools/eslint-plugin-highcharts/node_modules/**
 tools/jsdoc/storage/**/*.js
 ts/**/*.js
