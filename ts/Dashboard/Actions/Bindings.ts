@@ -73,7 +73,9 @@ class Bindings {
                 Cell.setContainerSize(options.dimensions, compontentContainer);
 
                 // Set the dimensions to undefined to adopt to cell
-                // options.dimensions = void 0;
+                options.dimensions = void 0;
+            } else {
+                compontentContainer.style.flexBasis = '100%';
             }
 
             switch (options.type) {
