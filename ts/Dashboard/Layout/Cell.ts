@@ -56,10 +56,8 @@ class Cell extends GUIElement {
         const height = dimensions.width;
 
         if (width) {
-            cellContainer.style.width = isNumber(width) ?
+            cellContainer.style.flexBasis = isNumber(width) ?
                 dimensions.width + 'px' : width;
-
-            cellContainer.style.flex = 'none';
         }
 
         if (height) {

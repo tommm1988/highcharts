@@ -15,7 +15,8 @@ const {
     addEvent,
     fireEvent,
     objectEach,
-    merge
+    merge,
+    getStyle
 } = U;
 class Bindings {
     /* *
@@ -65,6 +66,16 @@ class Bindings {
 
         // add elements to containers
         if (compontentContainer) {
+
+            // update cell size (when component is wider, cell should adjust)
+            // this.updateSize();
+            if (options && options.dimensions) {
+                Cell.setContainerSize(options.dimensions, compontentContainer);
+
+                // Set the dimensions to undefined to adopt to cell
+                // options.dimensions = void 0;
+            }
+
             switch (options.type) {
                 case 'chart':
                     component = Bindings.chartComponent(
@@ -88,13 +99,9 @@ class Bindings {
                     component = void 0;
             }
 
-            component?.render();
-
-            // update cell size (when component is wider, cell should adjust)
-            // this.updateSize();
-            if (options && options.dimensions) {
-                Cell.setContainerSize(options.dimensions, compontentContainer);
-            }
+            setTimeout(() => {
+                component?.render();
+            }, 0);
         }
 
         // add events
