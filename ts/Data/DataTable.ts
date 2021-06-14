@@ -342,18 +342,23 @@ class DataTable implements DataEventEmitter<DataTable.Event>, DataJSON.Class {
      * @param {string} alias
      * The alias to delete.
      *
-     * @return {string|undefined}
+     * @return {Promise<(string|undefined)>}
      * Returns the original column name, if found.
      */
-    public deleteColumnAlias(alias: string): (string|undefined) {
-        const table = this,
-            aliasMap = table.aliasMap,
-            deletedAlias = aliasMap[alias];
+    public deleteColumnAlias(
+        alias: string
+    ): DataPromise<(string|void)> {
+        return DataPromise
+            .resolve(this)
+            .then((table): (string|void) => {
+                const aliasMap = table.aliasMap,
+                    deletedAlias: (string|void) = aliasMap[alias];
 
-        if (deletedAlias) {
-            delete table.aliasMap[alias];
-            return deletedAlias;
-        }
+                if (typeof deletedAlias !== 'undefined') {
+                    delete table.aliasMap[alias];
+                    return deletedAlias;
+                }
+            });
     }
 
     /**
@@ -368,7 +373,7 @@ class DataTable implements DataEventEmitter<DataTable.Event>, DataJSON.Class {
      * @param {Highcharts.DataTableEventDetail} [eventDetail]
      * Custom information for pending events.
      *
-     * @return {Highcharts.DataTableColumnCollection|undefined}
+     * @return {Promise<(Highcharts.DataTableColumnCollection|undefined)>}
      * Returns the deleted columns, if found.
      *
      * @emits #deleteColumns
@@ -377,49 +382,53 @@ class DataTable implements DataEventEmitter<DataTable.Event>, DataJSON.Class {
     public deleteColumns(
         columnNames?: Array<string>,
         eventDetail?: DataEventEmitter.EventDetail
-    ): (DataTable.ColumnCollection|undefined) {
-        const table = this,
-            columns = table.columns,
-            deletedColumns: DataTable.ColumnCollection = {};
+    ): DataPromise<(DataTable.ColumnCollection|void)> {
+        return DataPromise
+            .resolve(this)
+            .then((table): (DataTable.ColumnCollection|undefined) => {
+                const columns = table.columns;
 
-        columnNames = (columnNames || Object.keys(columns));
+                columnNames = (columnNames || Object.keys(columns));
 
-        if (columnNames.length) {
-            table.emit({
-                type: 'deleteColumns',
-                columnNames,
-                detail: eventDetail
-            });
+                if (columnNames.length) {
+                    const deletedColumns: DataTable.ColumnCollection = {};
 
-            for (
-                let i = 0,
-                    iEnd = columnNames.length,
-                    column: DataTable.Column,
-                    columnName: string;
-                i < iEnd;
-                ++i
-            ) {
-                columnName = columnNames[i];
-                column = columns[columnName];
-                if (column) {
-                    deletedColumns[columnName] = column;
+                    table.emit({
+                        type: 'deleteColumns',
+                        columnNames,
+                        detail: eventDetail
+                    });
+
+                    for (
+                        let i = 0,
+                            iEnd = columnNames.length,
+                            column: DataTable.Column,
+                            columnName: string;
+                        i < iEnd;
+                        ++i
+                    ) {
+                        columnName = columnNames[i];
+                        column = columns[columnName];
+                        if (column) {
+                            deletedColumns[columnName] = column;
+                        }
+                        delete columns[columnName];
+                    }
+
+                    if (!Object.keys(columns).length) {
+                        table.rowCount = 0;
+                    }
+
+                    table.emit({
+                        type: 'afterDeleteColumns',
+                        columns: deletedColumns,
+                        columnNames,
+                        detail: eventDetail
+                    });
+
+                    return deletedColumns;
                 }
-                delete columns[columnName];
-            }
-
-            if (!Object.keys(columns).length) {
-                table.rowCount = 0;
-            }
-
-            table.emit({
-                type: 'afterDeleteColumns',
-                columns: deletedColumns,
-                columnNames,
-                detail: eventDetail
             });
-
-            return deletedColumns;
-        }
     }
 
     /**
@@ -437,7 +446,7 @@ class DataTable implements DataEventEmitter<DataTable.Event>, DataJSON.Class {
      * @param {Highcharts.DataTableEventDetail} [eventDetail]
      * Custom information for pending events.
      *
-     * @return {Array<Highcharts.DataTableRow>}
+     * @return {Promise<Array<Highcharts.DataTableRow>>}
      * Returns the deleted rows, if found.
      *
      * @emits #deleteRows
@@ -447,57 +456,65 @@ class DataTable implements DataEventEmitter<DataTable.Event>, DataJSON.Class {
         rowIndex?: number,
         rowCount: number = 1,
         eventDetail?: DataEventEmitter.EventDetail
-    ): Array<DataTable.Row> {
-        const table = this,
-            deletedRows: Array<DataTable.Row> = [];
+    ): DataPromise<Array<DataTable.Row>> {
+        return DataPromise
+            .resolve(this)
+            .then((table): Array<DataTable.Row> => {
+                const deletedRows: Array<DataTable.Row> = [];
 
-        table.emit({
-            type: 'deleteRows',
-            detail: eventDetail,
-            rowCount,
-            rowIndex: (rowIndex || 0)
-        });
+                table.emit({
+                    type: 'deleteRows',
+                    detail: eventDetail,
+                    rowCount,
+                    rowIndex: (rowIndex || 0)
+                });
 
-        if (typeof rowIndex === 'undefined') {
-            rowIndex = 0;
-            rowCount = table.rowCount;
-        }
-
-        if (rowCount > 0 && rowIndex < table.rowCount) {
-            const columns = table.columns,
-                columnNames = Object.keys(columns);
-
-            for (
-                let i = 0,
-                    iEnd = columnNames.length,
-                    column: DataTable.Column,
-                    deletedCells: Array<DataTable.CellType>;
-                i < iEnd;
-                ++i
-            ) {
-                column = columns[columnNames[i]];
-                deletedCells = column.splice(rowIndex, rowCount);
-
-                if (!i) {
-                    table.rowCount = column.length;
+                if (typeof rowIndex === 'undefined') {
+                    rowIndex = 0;
+                    rowCount = table.rowCount;
                 }
 
-                for (let j = 0, jEnd = deletedCells.length; j < jEnd; ++j) {
-                    deletedRows[j] = (deletedRows[j] || []);
-                    deletedRows[j][i] = deletedCells[j];
+                if (rowCount > 0 && rowIndex < table.rowCount) {
+                    const columns = table.columns,
+                        columnNames = Object.keys(columns);
+
+                    for (
+                        let i = 0,
+                            iEnd = columnNames.length,
+                            column: DataTable.Column,
+                            deletedCells: Array<DataTable.CellType>;
+                        i < iEnd;
+                        ++i
+                    ) {
+                        column = columns[columnNames[i]];
+                        deletedCells = column.splice(rowIndex, rowCount);
+
+                        if (!i) {
+                            table.rowCount = column.length;
+                        }
+
+                        for (
+                            let j = 0,
+                                jEnd = deletedCells.length;
+                            j < jEnd;
+                            ++j
+                        ) {
+                            deletedRows[j] = (deletedRows[j] || []);
+                            deletedRows[j][i] = deletedCells[j];
+                        }
+                    }
                 }
-            }
-        }
 
-        table.emit({
-            type: 'afterDeleteRows',
-            detail: eventDetail,
-            rowCount,
-            rowIndex: (rowIndex || 0),
-            rows: deletedRows
-        });
+                table.emit({
+                    type: 'afterDeleteRows',
+                    detail: eventDetail,
+                    rowCount,
+                    rowIndex: (rowIndex || 0),
+                    rows: deletedRows
+                });
 
-        return deletedRows;
+                return deletedRows;
+            });
     }
 
     /**
@@ -1192,32 +1209,35 @@ class DataTable implements DataEventEmitter<DataTable.Event>, DataJSON.Class {
      * New name of the column. An existing column with the same name will be
      * replaced.
      *
-     * @return {boolean}
+     * @return {Promise<boolean>}
      * Returns `true` if successful, `false` if the column was not found.
      */
     public renameColumn(
         columnName: string,
         newColumnName: string
-    ): boolean {
-        const table = this,
-            columns = table.columns;
+    ): DataPromise<boolean> {
+        return DataPromise
+            .resolve(this)
+            .then((table): boolean => {
+                const columns = table.columns;
 
-        if (columns[columnName]) {
-            if (columnName !== newColumnName) {
-                const aliasMap = table.aliasMap;
+                if (columns[columnName]) {
+                    if (columnName !== newColumnName) {
+                        const aliasMap = table.aliasMap;
 
-                if (aliasMap[newColumnName]) {
-                    delete aliasMap[newColumnName];
+                        if (aliasMap[newColumnName]) {
+                            delete aliasMap[newColumnName];
+                        }
+
+                        columns[newColumnName] = columns[columnName];
+                        delete columns[columnName];
+                    }
+
+                    return true;
                 }
 
-                columns[newColumnName] = columns[columnName];
-                delete columns[columnName];
-            }
-
-            return true;
-        }
-
-        return false;
+                return false;
+            });
     }
 
     /**
@@ -1250,50 +1270,58 @@ class DataTable implements DataEventEmitter<DataTable.Event>, DataJSON.Class {
         cellValue: DataTable.CellType,
         eventDetail?: DataEventEmitter.EventDetail
     ): DataPromise<this> {
-        const table = this,
-            columns = table.columns,
-            modifier = table.modifier;
+        return DataPromise
+            .resolve(this)
+            .then((table): (this|DataPromise<this>) => {
+                const columns = table.columns,
+                    modifier = table.modifier;
 
-        columnNameOrAlias = (
-            table.aliasMap[columnNameOrAlias] ||
-            columnNameOrAlias
-        );
+                columnNameOrAlias = (
+                    table.aliasMap[columnNameOrAlias] ||
+                    columnNameOrAlias
+                );
 
-        let column = columns[columnNameOrAlias];
+                let column = columns[columnNameOrAlias];
 
-        if (!column) {
-            column = columns[columnNameOrAlias] = new Array(table.rowCount);
-        } else if (column[rowIndex] === cellValue) {
-            return DataPromise.resolve(table);
-        }
+                if (!column) {
+                    column = columns[columnNameOrAlias] = new Array(table.rowCount);
+                } else if (column[rowIndex] === cellValue) {
+                    return table;
+                }
 
-        table.emit({
-            type: 'setCell',
-            cellValue,
-            columnName: columnNameOrAlias,
-            detail: eventDetail,
-            rowIndex
-        });
+                table.emit({
+                    type: 'setCell',
+                    cellValue,
+                    columnName: columnNameOrAlias,
+                    detail: eventDetail,
+                    rowIndex
+                });
 
-        if (rowIndex >= table.rowCount) {
-            table.rowCount = (rowIndex + 1);
-        }
+                if (rowIndex >= table.rowCount) {
+                    table.rowCount = (rowIndex + 1);
+                }
 
-        column[rowIndex] = cellValue;
+                column[rowIndex] = cellValue;
 
-        if (modifier) {
-            modifier.modifyCell(table, columnNameOrAlias, rowIndex, cellValue);
-        }
+                let promise: DataPromise<this>;
 
-        table.emit({
-            type: 'afterSetCell',
-            cellValue,
-            columnName: columnNameOrAlias,
-            detail: eventDetail,
-            rowIndex
-        });
+                if (modifier) {
+                    promise = modifier.modifyCell(table, columnNameOrAlias, rowIndex, cellValue);
+                } else {
+                    promise = DataPromise.resolve(table);
+                }
 
-        return DataPromise.resolve(this);
+                return promise.then((): this => {
+                    table.emit({
+                        type: 'afterSetCell',
+                        cellValue,
+                        columnName: columnNameOrAlias,
+                        detail: eventDetail,
+                        rowIndex
+                    });
+                    return table;
+                });
+            });
     }
 
     /**
@@ -1345,15 +1373,20 @@ class DataTable implements DataEventEmitter<DataTable.Event>, DataJSON.Class {
     public setColumnAlias(
         columnAlias: string,
         columnName: string
-    ): boolean {
-        const aliasMap = this.aliasMap;
+    ): DataPromise<boolean> {
+        return DataPromise
+            .resolve(this)
+            .then((table): boolean => {
+                const aliasMap = this.aliasMap;
 
-        if (!aliasMap[columnAlias]) {
-            aliasMap[columnAlias] = columnName;
-            return true;
-        }
+                if (aliasMap[columnAlias]) {
+                    return false;
+                }
 
-        return false;
+                aliasMap[columnAlias] = columnName;
+
+                return true;
+            });
     }
 
     /**
@@ -1371,7 +1404,7 @@ class DataTable implements DataEventEmitter<DataTable.Event>, DataJSON.Class {
      * @param {Highcharts.DataTableEventDetail} [eventDetail]
      * Custom information for pending events.
      *
-     * @return {Promise}
+     * @return {Promise<Highcharts.DataTable>}
      * Resolves to the table if successful, otherwise rejects promise.
      *
      * @emits #setColumns
@@ -1382,78 +1415,86 @@ class DataTable implements DataEventEmitter<DataTable.Event>, DataJSON.Class {
         rowIndex?: number,
         eventDetail?: DataEventEmitter.EventDetail
     ): DataPromise<this> {
-        const table = this,
-            tableColumns = table.columns,
-            tableModifier = table.modifier,
-            tableRowCount = table.rowCount,
-            reset = (typeof rowIndex === 'undefined'),
-            columnNames = Object.keys(columns);
+        return DataPromise
+            .resolve(this)
+            .then((table): DataPromise<this> => {
+                const tableColumns = table.columns,
+                    tableModifier = table.modifier,
+                    tableRowCount = table.rowCount,
+                    reset = (typeof rowIndex === 'undefined'),
+                    columnNames = Object.keys(columns);
 
-        table.emit({
-            type: 'setColumns',
-            columns,
-            columnNames,
-            detail: eventDetail,
-            rowIndex
-        });
+                table.emit({
+                    type: 'setColumns',
+                    columns,
+                    columnNames,
+                    detail: eventDetail,
+                    rowIndex
+                });
 
-        for (
-            let i = 0,
-                iEnd = columnNames.length,
-                column: DataTable.Column,
-                columnName: string;
-            i < iEnd;
-            ++i
-        ) {
-            columnName = columnNames[i];
-            column = columns[columnName];
-            columnName = (
-                table.aliasMap[columnName] ||
-                columnName
-            );
+                for (
+                    let i = 0,
+                        iEnd = columnNames.length,
+                        column: DataTable.Column,
+                        columnName: string;
+                    i < iEnd;
+                    ++i
+                ) {
+                    columnName = columnNames[i];
+                    column = columns[columnName];
+                    columnName = (
+                        table.aliasMap[columnName] ||
+                        columnName
+                    );
 
-            if (reset) {
-                tableColumns[columnName] = column.slice();
-                table.rowCount = column.length;
-            } else {
-                const tableColumn = (
-                    tableColumns[columnName] ?
-                        tableColumns[columnName] :
-                        tableColumns[columnName] = new Array(table.rowCount)
-                );
+                    if (reset) {
+                        tableColumns[columnName] = column.slice();
+                        table.rowCount = column.length;
+                    } else {
+                        const tableColumn = (
+                            tableColumns[columnName] ?
+                                tableColumns[columnName] :
+                                tableColumns[columnName] = new Array(table.rowCount)
+                        );
 
-                rowIndex = (rowIndex || 0);
+                        rowIndex = (rowIndex || 0);
 
-                if (rowIndex > tableRowCount) {
-                    tableColumn.length = rowIndex;
-                    tableColumn.push(...column);
-                } else {
-                    tableColumn.splice(rowIndex, (column.length - rowIndex), ...column);
+                        if (rowIndex > tableRowCount) {
+                            tableColumn.length = rowIndex;
+                            tableColumn.push(...column);
+                        } else {
+                            tableColumn.splice(rowIndex, (column.length - rowIndex), ...column);
+                        }
+
+                        table.rowCount = Math.max(table.rowCount, tableColumn.length);
+                    }
                 }
 
-                table.rowCount = Math.max(table.rowCount, tableColumn.length);
-            }
-        }
+                const tableColumnNames = Object.keys(tableColumns);
 
-        const tableColumnNames = Object.keys(tableColumns);
+                for (let i = 0, iEnd = tableColumnNames.length; i < iEnd; ++i) {
+                    tableColumns[tableColumnNames[i]].length = table.rowCount;
+                }
 
-        for (let i = 0, iEnd = tableColumnNames.length; i < iEnd; ++i) {
-            tableColumns[tableColumnNames[i]].length = table.rowCount;
-        }
+                let promise: DataPromise<this>;
 
-        if (tableModifier) {
-            tableModifier.modifyColumns(table, columns, (rowIndex || 0));
-        }
+                if (tableModifier) {
+                    promise = tableModifier.modifyColumns(table, columns, (rowIndex || 0));
+                } else {
+                    promise = DataPromise.resolve(table);
+                }
 
-        table.emit({
-            type: 'afterSetColumns',
-            columns,
-            columnNames,
-            detail: eventDetail,
-            rowIndex
-        });
-
-        return DataPromise.resolve(table);
+                return promise.then((): this => {
+                    table.emit({
+                        type: 'afterSetColumns',
+                        columns,
+                        columnNames,
+                        detail: eventDetail,
+                        rowIndex
+                    });
+                    return table;
+                });
+            });
     }
 
     /**
@@ -1465,34 +1506,43 @@ class DataTable implements DataEventEmitter<DataTable.Event>, DataJSON.Class {
      *
      * @param {Highcharts.DataTableEventDetail} [eventDetail]
      * Custom information for pending events.
+     *
+     * @return {Promise<Highcharts.DataTable>}
+     * Resolves to the table if successful, otherwise rejects promise.
      */
     public setModifier(
         modifier: (DataModifier | undefined),
         eventDetail?: DataEventEmitter.EventDetail
-    ): void {
-        const table = this;
+    ): DataPromise<this> {
+        return DataPromise
+            .resolve(this)
+            .then((table): DataPromise<this> => {
+                table.emit({
+                    type: 'setModifier',
+                    detail: eventDetail,
+                    modifier,
+                    modified: table.modified
+                });
 
-        table.emit({
-            type: 'setModifier',
-            detail: eventDetail,
-            modifier,
-            modified: table.modified
-        });
+                if (modifier) {
+                    table.modified = table.clone(true, eventDetail);
+                    table.modifier = modifier;
+                    return modifier.modifyTable(table);
+                }
 
-        table.modifier = modifier;
-
-        if (modifier) {
-            table.modified = modifier.modify(table.clone());
-        } else if (table.modified !== table) {
-            table.modified = table;
-        }
-
-        this.emit({
-            type: 'afterSetModifier',
-            detail: eventDetail,
-            modifier,
-            modified: table.modified
-        });
+                table.modified = table;
+                table.modifier = modifier;
+                return DataPromise.resolve(table);
+            })
+            .then((table): this => {
+                table.emit({
+                    type: 'afterSetModifier',
+                    detail: eventDetail,
+                    modifier,
+                    modified: table.modified
+                });
+                return table;
+            });
     }
 
     /**
@@ -1554,77 +1604,85 @@ class DataTable implements DataEventEmitter<DataTable.Event>, DataJSON.Class {
         rowIndex: number = this.rowCount,
         eventDetail?: DataEventEmitter.EventDetail
     ): DataPromise<this> {
-        const table = this,
-            aliasMap = table.aliasMap,
-            columns = table.columns,
-            columnNames = Object.keys(columns),
-            modifier = table.modifier,
-            rowCount = rows.length;
+        return DataPromise
+            .resolve(this)
+            .then((table): DataPromise<this> => {
+                const aliasMap = table.aliasMap,
+                    columns = table.columns,
+                    columnNames = Object.keys(columns),
+                    modifier = table.modifier,
+                    rowCount = rows.length;
 
-        table.emit({
-            type: 'setRows',
-            detail: eventDetail,
-            rowCount,
-            rowIndex,
-            rows
-        });
+                table.emit({
+                    type: 'setRows',
+                    detail: eventDetail,
+                    rowCount,
+                    rowIndex,
+                    rows
+                });
 
-        for (
-            let i = 0,
-                i2 = rowIndex,
-                row: (DataTable.Row|DataTable.RowObject);
-            i < rowCount;
-            ++i, ++i2
-        ) {
-            row = rows[i];
-            if (row === DataTable.NULL) {
-                for (let j = 0, jEnd = columnNames.length; j < jEnd; ++j) {
-                    columns[columnNames[j]][i2] = null;
-                }
-            } else if (row instanceof Array) {
-                for (let j = 0, jEnd = columnNames.length; j < jEnd; ++j) {
-                    columns[columnNames[j]][i2] = row[j];
-                }
-            } else {
-                const rowColumnNames = Object.keys(row);
                 for (
-                    let j = 0,
-                        jEnd = rowColumnNames.length,
-                        rowColumnName: string;
-                    j < jEnd;
-                    ++j
+                    let i = 0,
+                        i2 = rowIndex,
+                        row: (DataTable.Row|DataTable.RowObject);
+                    i < rowCount;
+                    ++i, ++i2
                 ) {
-                    rowColumnName = rowColumnNames[j];
-                    rowColumnName = (aliasMap[rowColumnName] || rowColumnName);
-                    if (!columns[rowColumnName]) {
-                        columns[rowColumnName] = new Array(i2 + 1);
+                    row = rows[i];
+                    if (row === DataTable.NULL) {
+                        for (let j = 0, jEnd = columnNames.length; j < jEnd; ++j) {
+                            columns[columnNames[j]][i2] = null;
+                        }
+                    } else if (row instanceof Array) {
+                        for (let j = 0, jEnd = columnNames.length; j < jEnd; ++j) {
+                            columns[columnNames[j]][i2] = row[j];
+                        }
+                    } else {
+                        const rowColumnNames = Object.keys(row);
+                        for (
+                            let j = 0,
+                                jEnd = rowColumnNames.length,
+                                rowColumnName: string;
+                            j < jEnd;
+                            ++j
+                        ) {
+                            rowColumnName = rowColumnNames[j];
+                            rowColumnName = (aliasMap[rowColumnName] || rowColumnName);
+                            if (!columns[rowColumnName]) {
+                                columns[rowColumnName] = new Array(i2 + 1);
+                            }
+                            columns[rowColumnName][i2] = row[rowColumnName];
+                        }
                     }
-                    columns[rowColumnName][i2] = row[rowColumnName];
                 }
-            }
-        }
 
-        const indexRowCount = (rowIndex + rowCount);
-        if (indexRowCount > table.rowCount) {
-            table.rowCount = indexRowCount;
-            for (let i = 0, iEnd = columnNames.length; i < iEnd; ++i) {
-                columns[columnNames[i]].length = indexRowCount;
-            }
-        }
+                const indexRowCount = (rowIndex + rowCount);
+                if (indexRowCount > table.rowCount) {
+                    table.rowCount = indexRowCount;
+                    for (let i = 0, iEnd = columnNames.length; i < iEnd; ++i) {
+                        columns[columnNames[i]].length = indexRowCount;
+                    }
+                }
 
-        if (modifier) {
-            modifier.modifyRows(table, rows, rowIndex);
-        }
+                let promise: DataPromise<this>;
 
-        table.emit({
-            type: 'afterSetRows',
-            detail: eventDetail,
-            rowCount,
-            rowIndex,
-            rows
-        });
+                if (modifier) {
+                    promise = modifier.modifyRows(table, rows, rowIndex);
+                } else {
+                    promise = DataPromise.resolve(table);
+                }
 
-        return DataPromise.resolve(table);
+                return promise.then((): this => {
+                    table.emit({
+                        type: 'afterSetRows',
+                        detail: eventDetail,
+                        rowCount,
+                        rowIndex,
+                        rows
+                    });
+                    return table;
+                });
+            });
     }
 
     /**

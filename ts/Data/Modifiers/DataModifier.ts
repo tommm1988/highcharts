@@ -20,8 +20,12 @@
 
 import type DataEventEmitter from '../DataEventEmitter';
 import type DataJSON from '../DataJSON';
-import type ModifierType from './ModifierType';
 import type DataTable from '../DataTable';
+import type ModifierType from './ModifierType';
+
+import H from '../../Core/Globals.js';
+const { win } = H;
+import DataPromise from '../DataPromise.js';
 import U from '../../Core/Utilities.js';
 const {
     addEvent,
@@ -175,62 +179,36 @@ implements DataEventEmitter<TEvent>, DataJSON.Class {
      * @param {DataModifier.BenchmarkOptions} options
      * Options. Currently supports `iterations` for number of iterations.
      *
-     * @return {Array<number>}
+     * @return {Promise<Array<number>>}
      * An array of times in milliseconds
      *
      */
     public benchmark(
         dataTable: DataTable,
         options?: DataModifier.BenchmarkOptions
-    ): Array<number> {
-        const results: Array<number> = [];
-        const modifier = this as DataModifier<DataModifier.BenchmarkEvent|DataModifier.Event>;
-        const execute = (): void => {
-            modifier.modify(dataTable);
-            modifier.emit({ type: 'afterBenchmarkIteration' });
-        };
+    ): DataPromise<Array<number>> {
+        const modifier = this as DataModifier<DataModifier.Event>,
+            results: Array<number> = [];
 
-        const defaultOptions = {
-            iterations: 1
-        };
+        let promise = DataPromise.resolve(),
+            iterations = (options && options.iterations || 1);
 
-        const { iterations } = merge(
-            defaultOptions,
-            options
-        );
+        while (iterations--) {
+            promise = promise
+                .then((): number => win.performance.now())
+                .then((startTime): DataPromise<number> =>
+                    modifier.modifyTable(dataTable).then((): number => startTime)
+                )
+                .then((startTime): void => {
+                    results.push(win.performance.now() - startTime);
+                    modifier.emit({ type: 'afterBenchmarkIteration' });
+                });
+        }
 
-        modifier.on('afterBenchmarkIteration', (): void => {
-            if (results.length === iterations) {
-                modifier.emit({ type: 'afterBenchmark', results });
-                return;
-            }
-
-            // Run again
-            execute();
+        return promise.then((): Array<number> => {
+            modifier.emit({ type: 'afterBenchmark', results });
+            return results;
         });
-
-        const times: {
-            startTime: number;
-            endTime: number;
-        } = {
-            startTime: 0,
-            endTime: 0
-        };
-
-        // Add timers
-        modifier.on('modify', (): void => {
-            times.startTime = window.performance.now();
-        });
-
-        modifier.on('afterModify', (): void => {
-            times.endTime = window.performance.now();
-            results.push(times.endTime - times.startTime);
-        });
-
-        // Initial run
-        execute();
-
-        return results;
     }
 
     /**
@@ -242,23 +220,6 @@ implements DataEventEmitter<TEvent>, DataJSON.Class {
     public emit(e: TEvent): void {
         fireEvent(this, e.type, e);
     }
-
-    /**
-     * Returns a modified copy of the given table.
-     *
-     * @param {Highcharts.DataTable} table
-     * Table to modify.
-     *
-     * @param {DataEventEmitter.EventDetail} [eventDetail]
-     * Custom information for pending events.
-     *
-     * @return {Highcharts.DataTable}
-     * Modified copy.
-     */
-    public abstract modify(
-        table: DataTable,
-        eventDetail?: DataEventEmitter.EventDetail
-    ): DataTable;
 
     /**
      * Applies partial modifications of a cell change to the property `modified`
@@ -279,16 +240,16 @@ implements DataEventEmitter<TEvent>, DataJSON.Class {
      * @param {Highcharts.DataTableEventDetail} [eventDetail]
      * Custom information for pending events.
      *
-     * @return {Highcharts.DataTable}
+     * @return {Promise<Highcharts.DataTable>}
      * `table.modified` as a reference.
      */
-    public abstract modifyCell(
-        table: DataTable,
+    public abstract modifyCell<T extends DataTable>(
+        table: T,
         columnName: string,
         rowIndex: number,
         cellValue: DataTable.CellType,
         eventDetail?: DataEventEmitter.EventDetail
-    ): DataTable;
+    ): DataPromise<T>;
 
     /**
      * Applies partial modifications of column changes to the property
@@ -306,15 +267,15 @@ implements DataEventEmitter<TEvent>, DataJSON.Class {
      * @param {Highcharts.DataTableEventDetail} [eventDetail]
      * Custom information for pending events.
      *
-     * @return {Highcharts.DataTable}
+     * @return {Promise<Highcharts.DataTable>}
      * `table.modified` as a reference.
      */
-    public abstract modifyColumns(
-        table: DataTable,
+    public abstract modifyColumns<T extends DataTable>(
+        table: T,
         columns: DataTable.ColumnCollection,
         rowIndex: number,
         eventDetail?: DataEventEmitter.EventDetail
-    ): DataTable;
+    ): DataPromise<T>;
 
     /**
      * Applies partial modifications of row changes to the property `modified`
@@ -332,15 +293,32 @@ implements DataEventEmitter<TEvent>, DataJSON.Class {
      * @param {Highcharts.DataTableEventDetail} [eventDetail]
      * Custom information for pending events.
      *
-     * @return {Highcharts.DataTable}
+     * @return {Promise<Highcharts.DataTable>}
      * `table.modified` as a reference.
      */
-    public abstract modifyRows(
-        table: DataTable,
+    public abstract modifyRows<T extends DataTable>(
+        table: T,
         rows: Array<(DataTable.Row|DataTable.RowObject)>,
         rowIndex: number,
         eventDetail?: DataEventEmitter.EventDetail
-    ): DataTable;
+    ): DataPromise<T>;
+
+    /**
+     * Directly modifies the given table in place.
+     *
+     * @param {Highcharts.DataTable} table
+     * Table to modify.
+     *
+     * @param {DataEventEmitter.EventDetail} [eventDetail]
+     * Custom information for pending events.
+     *
+     * @return {Promise<Highcharts.DataTable>}
+     * Table as a reference.
+     */
+    public abstract modifyTable<T extends DataTable>(
+        table: T,
+        eventDetail?: DataEventEmitter.EventDetail
+    ): DataPromise<T>;
 
     /**
      * Registers a callback for a specific modifier event.
@@ -384,6 +362,24 @@ implements DataEventEmitter<TEvent>, DataJSON.Class {
 namespace DataModifier {
 
     /**
+     * Benchmark event with additional event information.
+     */
+    export interface BenchmarkEvent extends DataEventEmitter.Event {
+        readonly type: (
+            'afterBenchmark'|
+            'afterBenchmarkIteration'
+        );
+        readonly results?: Array<number>;
+    }
+
+    /**
+     * Benchmark options.
+     */
+    export interface BenchmarkOptions {
+        iterations: number;
+    }
+
+    /**
      * Class constructor of modifiers.
      *
      * @param {DeepPartial<Options>} [options]
@@ -401,24 +397,6 @@ namespace DataModifier {
          * Options to configure the modifier.
          */
         options: Options;
-    }
-
-    /**
-     * Benchmark event with additional event information.
-     */
-    export interface BenchmarkEvent extends DataEventEmitter.Event {
-        readonly type: (
-            'afterBenchmark'|
-            'afterBenchmarkIteration'
-        );
-        readonly results?: Array<number>;
-    }
-
-    /**
-     * Benchmark options.
-     */
-    export interface BenchmarkOptions {
-        iterations: number;
     }
 
     /**

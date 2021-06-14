@@ -19,8 +19,10 @@
  * */
 
 import type DataEventEmitter from '../DataEventEmitter';
+
 import DataJSON from '../DataJSON.js';
 import DataModifier from './DataModifier.js';
+import DataPromise from '../DataPromise.js';
 import DataTable from '../DataTable.js';
 import U from '../../Core/Utilities.js';
 const { merge } = U;
@@ -107,94 +109,6 @@ class GroupModifier extends DataModifier {
      * */
 
     /**
-     * Applies modifications to the table rows and returns a new table with
-     * subtable, containing the grouped rows. The rows of the new table contain
-     * three columns:
-     * - `groupBy`: Column name used to group rows by.
-     * - `table`: Subtable containing the grouped rows.
-     * - `value`: containing the common value of the group
-     *
-     * @param {DataTable} table
-     * Table to modify.
-     *
-     * @param {DataEventEmitter.EventDetail} [eventDetail]
-     * Custom information for pending events.
-     *
-     * @return {DataTable}
-     * Modified table as a reference.
-     */
-    public modify(
-        table: DataTable,
-        eventDetail?: DataEventEmitter.EventDetail
-    ): DataTable {
-
-        this.emit({ type: 'modify', detail: eventDetail, table });
-
-        const modifier = this,
-            {
-                invalidValues,
-                validValues
-            } = modifier.options,
-            byGroups: Array<string> = [],
-            tableGroups: Array<DataTable> = [],
-            valueGroups: Array<DataJSON.JSONPrimitive> = [],
-            groupColumn = (
-                modifier.options.groupColumn ||
-                table.getColumnNames()[0]
-            ),
-            valueColumn = (
-                table.getColumn(groupColumn) ||
-                []
-            );
-
-        let value: DataTable.CellType,
-            valueIndex: number;
-
-        for (let i = 0, iEnd = valueColumn.length; i < iEnd; ++i) {
-            value = valueColumn[i];
-            if (typeof value !== 'undefined') {
-                if (
-                    value instanceof DataTable ||
-                    (
-                        invalidValues &&
-                        invalidValues.indexOf(value) >= 0
-                    ) || (
-                        validValues &&
-                        validValues.indexOf(value) === -1
-                    )
-                ) {
-                    continue;
-                }
-
-                valueIndex = valueGroups.indexOf(value);
-
-                if (valueIndex === -1) {
-                    const newTable = new DataTable();
-
-                    newTable.setRows([table.getRowObject(i) || {}]);
-
-                    byGroups.push(groupColumn);
-                    tableGroups.push(newTable);
-                    valueGroups.push(value);
-                } else {
-                    tableGroups[valueIndex].setRows([table.getRow(i) || []]);
-                }
-            }
-        }
-
-        table.deleteColumns();
-        table.setColumns({
-            groupBy: byGroups,
-            table: tableGroups,
-            value: valueGroups
-        });
-
-        this.emit({ type: 'afterModify', detail: eventDetail, table });
-
-        return table;
-    }
-
-    /**
      * Applies partial modifications of a cell change to the property `modified`
      * of the given modified table.
      *
@@ -216,19 +130,14 @@ class GroupModifier extends DataModifier {
      * @return {Highcharts.DataTable}
      * Modified table as a reference.
      */
-    public modifyCell(
-        table: DataTable,
+    public modifyCell<T extends DataTable>(
+        table: T,
         columnName: string,
         rowIndex: number,
         cellValue: DataTable.CellType,
         eventDetail?: DataEventEmitter.EventDetail
-    ): DataTable {
-        table.modified.setColumns(
-            this.modify(table.clone()).getColumns(),
-            void 0,
-            eventDetail
-        );
-        return table;
+    ): DataPromise<T> {
+        return this.modifyTable(table, eventDetail);
     }
 
     /**
@@ -250,18 +159,13 @@ class GroupModifier extends DataModifier {
      * @return {Highcharts.DataTable}
      * Modified table as a reference.
      */
-    public modifyColumns(
-        table: DataTable,
+    public modifyColumns<T extends DataTable>(
+        table: T,
         columns: DataTable.ColumnCollection,
         rowIndex: number,
         eventDetail?: DataEventEmitter.EventDetail
-    ): DataTable {
-        table.modified.setColumns(
-            this.modify(table.clone()).getColumns(),
-            void 0,
-            eventDetail
-        );
-        return table;
+    ): DataPromise<T> {
+        return this.modifyTable(table, eventDetail);
     }
 
     /**
@@ -283,18 +187,125 @@ class GroupModifier extends DataModifier {
      * @return {Highcharts.DataTable}
      * Modified table as a reference.
      */
-    public modifyRows(
-        table: DataTable,
+    public modifyRows<T extends DataTable>(
+        table: T,
         rows: Array<(DataTable.Row|DataTable.RowObject)>,
         rowIndex: number,
         eventDetail?: DataEventEmitter.EventDetail
-    ): DataTable {
-        table.modified.setColumns(
-            this.modify(table.clone()).getColumns(),
-            void 0,
-            eventDetail
-        );
-        return table;
+    ): DataPromise<T> {
+        return this.modifyTable(table, eventDetail);
+    }
+
+    /**
+     * Applies modifications to the table rows and returns a new table with
+     * subtable, containing the grouped rows. The rows of the new table contain
+     * three columns:
+     * - `groupBy`: Column name used to group rows by.
+     * - `table`: Subtable containing the grouped rows.
+     * - `value`: containing the common value of the group
+     *
+     * @param {Highcharts.DataTable} table
+     * Table to modify.
+     *
+     * @param {Highcharts.DataTableEventDetail} [eventDetail]
+     * Custom information for pending events.
+     *
+     * @return {Promise<Highcharts.DataTable>}
+     * Modified table as a reference.
+     */
+    public modifyTable<T extends DataTable>(
+        table: T,
+        eventDetail?: DataEventEmitter.EventDetail
+    ): DataPromise<T> {
+        return DataPromise
+            .resolve(this)
+            .then((modifier): (T|DataPromise<T>) => {
+                const byGroups: Array<string> = [],
+                    tableGroups: Array<DataTable> = [],
+                    valueGroups: Array<DataJSON.JSONPrimitive> = [],
+                    {
+                        invalidValues,
+                        validValues
+                    } = modifier.options;
+
+                this.emit({
+                    type: 'modify',
+                    detail: eventDetail,
+                    table
+                });
+
+                const groupColumn = (
+                        modifier.options.groupColumn ||
+                        table.getColumnNames()[0]
+                    ),
+                    valueColumn = (
+                        table.getColumn(groupColumn) ||
+                        []
+                    );
+
+                let promise = DataPromise.resolve();
+
+                for (
+                    let i = 0,
+                        iEnd = valueColumn.length,
+                        value: DataTable.CellType,
+                        valueIndex: number;
+                    i < iEnd;
+                    ++i
+                ) {
+                    value = valueColumn[i];
+                    if (typeof value !== 'undefined') {
+                        if (
+                            value instanceof DataTable ||
+                            (
+                                invalidValues &&
+                                invalidValues.indexOf(value) >= 0
+                            ) || (
+                                validValues &&
+                                validValues.indexOf(value) === -1
+                            )
+                        ) {
+                            continue;
+                        }
+
+                        valueIndex = valueGroups.indexOf(value);
+
+                        if (valueIndex === -1) {
+                            const newTable = new DataTable();
+
+                            byGroups.push(groupColumn);
+                            tableGroups.push(newTable);
+                            valueGroups.push(value);
+
+                            promise = promise.then((): DataPromise<DataTable> =>
+                                newTable.setRows([table.getRowObject(i) || {}])
+                            );
+                        } else {
+                            promise = promise.then((): DataPromise<DataTable> =>
+                                tableGroups[valueIndex].setRows([table.getRow(i) || []])
+                            );
+                        }
+                    }
+                }
+
+                return promise
+                    .then((): DataPromise<DataTable> => {
+                        table.modified = table.clone(true, eventDetail);
+                        return table.modified.setColumns({
+                            groupBy: byGroups,
+                            table: tableGroups,
+                            value: valueGroups
+                        });
+                    })
+                    .then((): T => {
+                        this.emit({
+                            type: 'afterModify',
+                            detail: eventDetail,
+                            table
+                        });
+                        return table;
+                    });
+            });
     }
 
     /**

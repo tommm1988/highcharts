@@ -22,11 +22,10 @@ import type DataEventEmitter from '../DataEventEmitter';
 
 import DataJSON from '../DataJSON.js';
 import DataModifier from './DataModifier.js';
+import DataPromise from '../DataPromise.js';
 import DataTable from '../DataTable.js';
 import U from '../../Core/Utilities.js';
-const {
-    merge
-} = U;
+const { merge } = U;
 
 /* *
  *
@@ -111,106 +110,6 @@ class RangeModifier extends DataModifier {
      * */
 
     /**
-     * Replaces table rows with filtered rows.
-     *
-     * @param {DataTable} table
-     * Table to modify.
-     *
-     * @param {DataEventEmitter.EventDetail} [eventDetail]
-     * Custom information for pending events.
-     *
-     * @return {DataTable}
-     * Table as a reference.
-     */
-    public modify(
-        table: DataTable,
-        eventDetail?: DataEventEmitter.EventDetail
-    ): DataTable {
-        const modifier = this,
-            {
-                ranges,
-                strict
-            } = modifier.options;
-
-        this.emit({ type: 'modify', detail: eventDetail, table });
-
-        if (ranges.length) {
-            const columns = table.getColumns(),
-                rows: Array<DataTable.Row> = [];
-
-            for (
-                let i = 0,
-                    iEnd = ranges.length,
-                    range: RangeModifier.RangeOptions,
-                    rangeColumn: DataTable.Column;
-                i < iEnd;
-                ++i
-            ) {
-                range = ranges[i];
-
-                if (
-                    strict &&
-                    typeof range.minValue !== typeof range.maxValue
-                ) {
-                    continue;
-                }
-
-                rangeColumn = (columns[range.column] || []);
-
-                for (
-                    let j = 0,
-                        jEnd = rangeColumn.length,
-                        cell: DataTable.CellType,
-                        row: (DataTable.Row|undefined);
-                    j < jEnd;
-                    ++j
-                ) {
-                    cell = rangeColumn[j];
-
-                    switch (typeof cell) {
-                        default:
-                            continue;
-                        case 'boolean':
-                        case 'number':
-                        case 'string':
-                            break;
-                    }
-
-                    if (
-                        strict &&
-                        typeof cell !== typeof range.minValue
-                    ) {
-                        continue;
-                    }
-
-                    if (
-                        cell >= range.minValue &&
-                        cell <= range.maxValue
-                    ) {
-                        row = table.getRow(j);
-
-                        if (row) {
-                            rows.push(row);
-                        }
-                    }
-                }
-            }
-
-            table.deleteRows();
-            table.setRows(rows);
-        }
-
-        this.emit({
-            type: 'afterModify',
-            detail: eventDetail,
-            table
-        });
-
-        return table;
-    }
-
-
-    /**
      * Applies partial modifications of a cell change to the property `modified`
      * of the given modified table.
      *
@@ -229,22 +128,17 @@ class RangeModifier extends DataModifier {
      * @param {Highcharts.DataTableEventDetail} [eventDetail]
      * Custom information for pending events.
      *
-     * @return {Highcharts.DataTable}
+     * @return {Promise<Highcharts.DataTable>}
      * Modified table as a reference.
      */
-    public modifyCell(
-        table: DataTable,
+    public modifyCell<T extends DataTable>(
+        table: T,
         columnName: string,
         rowIndex: number,
         cellValue: DataTable.CellType,
         eventDetail?: DataEventEmitter.EventDetail
-    ): DataTable {
-        table.modified.setColumns(
-            this.modify(table.clone()).getColumns(),
-            void 0,
-            eventDetail
-        );
-        return table;
+    ): DataPromise<T> {
+        return this.modifyTable(table, eventDetail);
     }
 
     /**
@@ -263,21 +157,16 @@ class RangeModifier extends DataModifier {
      * @param {Highcharts.DataTableEventDetail} [eventDetail]
      * Custom information for pending events.
      *
-     * @return {Highcharts.DataTable}
+     * @return {Promise<Highcharts.DataTable>}
      * Modified table as a reference.
      */
-    public modifyColumns(
-        table: DataTable,
+    public modifyColumns<T extends DataTable>(
+        table: T,
         columns: DataTable.ColumnCollection,
         rowIndex: number,
         eventDetail?: DataEventEmitter.EventDetail
-    ): DataTable {
-        table.modified.setColumns(
-            this.modify(table.clone()).getColumns(),
-            void 0,
-            eventDetail
-        );
-        return table;
+    ): DataPromise<T> {
+        return this.modifyTable(table, eventDetail);
     }
 
     /**
@@ -296,21 +185,127 @@ class RangeModifier extends DataModifier {
      * @param {Highcharts.DataTableEventDetail} [eventDetail]
      * Custom information for pending events.
      *
-     * @return {Highcharts.DataTable}
+     * @return {Promise<Highcharts.DataTable>}
      * Modified table as a reference.
      */
-    public modifyRows(
-        table: DataTable,
+    public modifyRows<T extends DataTable>(
+        table: T,
         rows: Array<(DataTable.Row|DataTable.RowObject)>,
         rowIndex: number,
         eventDetail?: DataEventEmitter.EventDetail
-    ): DataTable {
-        table.modified.setColumns(
-            this.modify(table.clone()).getColumns(),
-            void 0,
-            eventDetail
-        );
-        return table;
+    ): DataPromise<T> {
+        return this.modifyTable(table, eventDetail);
+    }
+
+    /**
+     * Replaces table rows with filtered rows.
+     *
+     * @param {DataTable} table
+     * Table to modify.
+     *
+     * @param {DataEventEmitter.EventDetail} [eventDetail]
+     * Custom information for pending events.
+     *
+     * @return {Promise<Highcharts.DataTable>}
+     * Table as a reference.
+     */
+    public modifyTable<T extends DataTable>(
+        table: T,
+        eventDetail?: DataEventEmitter.EventDetail
+    ): DataPromise<T> {
+        return DataPromise
+            .resolve(this)
+            .then((modifier): (T|DataPromise<T>) => {
+                const {
+                    ranges,
+                    strict
+                } = modifier.options;
+
+                if (!ranges.length) {
+                    return table;
+                }
+
+                this.emit({
+                    type: 'modify',
+                    detail: eventDetail,
+                    table
+                });
+
+                const columns = table.getColumns(),
+                    rows: Array<DataTable.Row> = [];
+
+                for (
+                    let i = 0,
+                        iEnd = ranges.length,
+                        range: RangeModifier.RangeOptions,
+                        rangeColumn: DataTable.Column;
+                    i < iEnd;
+                    ++i
+                ) {
+                    range = ranges[i];
+
+                    if (
+                        strict &&
+                        typeof range.minValue !== typeof range.maxValue
+                    ) {
+                        continue;
+                    }
+
+                    rangeColumn = (columns[range.column] || []);
+
+                    for (
+                        let j = 0,
+                            jEnd = rangeColumn.length,
+                            cell: DataTable.CellType,
+                            row: (DataTable.Row|undefined);
+                        j < jEnd;
+                        ++j
+                    ) {
+                        cell = rangeColumn[j];
+
+                        switch (typeof cell) {
+                            default:
+                                continue;
+                            case 'boolean':
+                            case 'number':
+                            case 'string':
+                                break;
+                        }
+
+                        if (
+                            strict &&
+                            typeof cell !== typeof range.minValue
+                        ) {
+                            continue;
+                        }
+
+                        if (
+                            cell >= range.minValue &&
+                            cell <= range.maxValue
+                        ) {
+                            row = table.getRow(j);
+
+                            if (row) {
+                                rows.push(row);
+                            }
+                        }
+                    }
+                }
+
+                table.modified = table.clone(true, eventDetail);
+
+                return table.modified
+                    .setColumns(columns)
+                    .then((): T => {
+                        modifier.emit({
+                            type: 'afterModify',
+                            detail: eventDetail,
+                            table
+                        });
+
+                        return table;
+                    });
+            });
     }
 
     /**

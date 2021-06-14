@@ -1,233 +1,387 @@
+import DataPromise from '/base/js/Data/DataPromise.js';
 import DataTable from '/base/js/Data/DataTable.js';
 import SortModifier from '/base/js/Data/Modifiers/SortModifier.js';
 
 QUnit.test('DataTable Clone', function (assert) {
-    const table = new DataTable({}, 'table');
 
-    table.setRows([[ 'row1', 1 ]]);
-    table.setCell('1', 0, 100);
-    table.setColumnAlias('x', 'x-alias');
+    const done = assert.async();
 
-    const tableClone = table.clone();
+    DataPromise
+        .resolve(new DataTable({}, 'table'))
+        .then((table) =>
+            table.setRows([[ 'row1', 1 ]])
+        )
+        .then((table) =>
+            table.setCell('1', 0, 100)
+        )
+        .then((table) =>
+            table
+                .setColumnAlias('x', 'x-alias')
+                .then(() =>
+                    table
+                )
+        )
+        .then((table) => {
+            const tableClone = table.clone();
+            assert.notStrictEqual(
+                table,
+                tableClone,
+                'Cloned table should be a new instance.'
+            );
+            assert.deepEqual(
+                table.aliasMap,
+                tableClone.aliasMap,
+                'Cloned and original table should have the same aliasMap elements.'
+            );
+            assert.deepEqual(
+                table.hcEvents,
+                tableClone.hcEvents,
+                'Cloned and original table should have the same events.'
+            );
+            assert.strictEqual(
+                table.id,
+                tableClone.id,
+                'Cloned and original table should have the same id.'
+            );
+            assert.strictEqual(
+                table.versionTag,
+                tableClone.versionTag,
+                'Cloned and original table should have the same versionTag.'
+            );
+            return table;
+        })
+        .catch((e) =>
+            assert.notOk(true, e)
+        )
+        .then(() =>
+            done()
+        );
 
-    assert.notStrictEqual(
-        table,
-        tableClone,
-        'Cloned table should be a new instance.'
-    );
-
-    assert.strictEqual(
-        table.converter,
-        tableClone.converter,
-        'Cloned and original table should have the same converter reference.'
-    );
-
-    assert.deepEqual(
-        table.aliasMap,
-        tableClone.aliasMap,
-        'Cloned and original table should have the same aliasMap elements.'
-    );
-
-    assert.deepEqual(
-        table.hcEvents,
-        tableClone.hcEvents,
-        'Cloned and original table should have the same events.'
-    );
-
-    assert.strictEqual(
-        table.id,
-        tableClone.id,
-        'Cloned and original table should have the same id.'
-    );
-
-    assert.strictEqual(
-        table.versionTag,
-        tableClone.versionTag,
-        'Cloned and original table should have the same versionTag.'
-    );
 });
 
 QUnit.test('DataTable Column Aliases', function (assert) {
-    const table = new DataTable();
 
-    table.setColumnAlias('x', 'population');
-    table.setColumnAlias('y', 'gdp');
-    table.setColumnAlias('z', 'id');
-    table.setColumnAlias('f', 'population');
+    const done = assert.async();
 
-    table.setRows([{
-        id: 'My Land',
-        population: 41251,
-        gdp: 150
-    }, {
-        id: 'Your Land',
-        population: 21251,
-        gdp: 950
-    }, {
-        id: 'Our Land',
-        population: new DataTable(),
-        gdp: 950,
-        nonexistant: 1
-    }]);
+    DataPromise
+        .resolve(new DataTable())
+        .then((table) =>
+            table
+                .setColumnAlias('x', 'population')
+                .then(() =>
+                    table
+                )
+        )
+        .then((table) =>
+            table
+                .setColumnAlias('y', 'gdp')
+                .then(() =>
+                    table
+                )
+        )
+        .then((table) =>
+            table
+                .setColumnAlias('z', 'id')
+                .then(() =>
+                    table
+                )
+        )
+        .then((table) =>
+            table
+                .setColumnAlias('f', 'population')
+                .then(() =>
+                    table
+                )
+        )
+        .then((table) =>
+            table.setRows([{
+                id: 'My Land',
+                population: 41251,
+                gdp: 150
+            }, {
+                id: 'Your Land',
+                population: 21251,
+                gdp: 950
+            }, {
+                id: 'Our Land',
+                population: new DataTable(),
+                gdp: 950,
+                nonexistant: 1
+            }])
+        )
+        .then((table) =>
+            table
+                .setColumnAlias('beta', 'nonexistant')
+                .then(() =>
+                    table
+                )
+        )
+        .then((table) =>
+            table
+                .setColumnAlias('beta', 'a')
+                .then((result) => {
+                    assert.strictEqual(
+                        result,
+                        false,
+                        'Returns false when attempting to add an existing alias.'
+                    );
+                    return table;
+                })
+        )
+        .then((table) => {
+            assert.deepEqual(
+                table.getColumn('x'),
+                table.getColumns(['population'])['population'],
+                'Table should return correct column for alias.'
+            );
+            return table;
+        })
+        .then((table) =>
+            table
+                .setColumnAlias('population', 'gdp')
+                .then(() =>
+                    table
+                )
+        )
+        .then((table) => {
+            assert.deepEqual(
+                table.getColumn('population'),
+                table.getColumn('gdp'),
+                'Table should prioritize alias.'
+            );
+            return table;
+        })
+        .then((table) =>
+            table
+                .deleteColumnAlias('population')
+                .then(() =>
+                    table
+                )
+        )
+        .then((table) => {
+            assert.notDeepEqual(
+                table.getColumn('population'),
+                table.getColumn('gdp'),
+                'Table should return canonical name, after alias is removed.'
+            );
+            return table;
+        })
+        .then((table) =>
+            table.setCell('population', table.getRowIndexBy('id', 'Our Land'), 4)
+        )
+        .then((table) => {
+            assert.strictEqual(
+                table.getCell('population', table.getRowIndexBy('id', 'Our Land')),
+                4,
+                'Table should set cell value for column name.'
+            )
+            return table;
+        })
+        .then((table) =>
+            table.setCell('x', table.getRowIndexBy('id', 'Our Land'), 10)
+        )
+        .then((table) => {
+            assert.strictEqual(
+                table.getCell('x', table.getRowIndexBy('id', 'Our Land')),
+                10,
+                'Table should set cell value for column alias.'
+            );
+            assert.strictEqual(
+                table.getCell('population', table.getRowIndexBy('id', 'Our Land')),
+                table.getCell('x', table.getRowIndexBy('id', 'Our Land')),
+                'Table should return cell value for column name and alias.'
+            );
+            return table;
+        })
+        .then((table) =>
+            table.setRows(
+                [{
+                    id: 'All Land',
+                    population: 4
+                }],
+                table.getRowIndexBy('id', 'All Land')
+            )
+        )
+        .then((table) => {
+            assert.strictEqual(
+                table.getCell('population', table.getRowIndexBy('id', 'All Land')),
+                4,
+                'Table should insert a new row with cell values.'
+            );
+            return table;
+        })
+        .then((table) => {
+            const colArray = [
+                'Tourmalet',
+                'Du Fromage',
+                'des Montagnes',
+                'Ventoux',
+                'Grand Cucheron',
+                'des Aravis'
+            ];
 
-    table.setColumnAlias('beta', 'nonexistant');
-    assert.strictEqual(
-        table.setColumnAlias('beta', 'a'),
-        false,
-        'Returns false when attempting to add an existing alias.'
-    );
-
-    assert.deepEqual(
-        table.getColumn('x'),
-        table.getColumns(['population'])['population'],
-        'Table should return correct column for alias.'
-    );
-
-    table.setColumnAlias('population', 'gdp')
-    assert.deepEqual(
-        table.getColumn('population'),
-        table.getColumn('gdp'),
-        'Table should prioritize alias.'
-    );
-
-    table.deleteColumnAlias('population');
-    assert.notDeepEqual(
-        table.getColumn('population'),
-        table.getColumn('gdp'),
-        'Table should return canonical name, after alias is removed.'
-    );
-
-    table.setCell('population', table.getRowIndexBy('id', 'Our Land'), 4),
-    assert.strictEqual(
-        table.getCell('population', table.getRowIndexBy('id', 'Our Land')),
-        4,
-        'Table should set cell value for column name.'
-    );
-    table.setCell('x', table.getRowIndexBy('id', 'Our Land'), 10),
-    assert.strictEqual(
-        table.getCell('x', table.getRowIndexBy('id', 'Our Land')),
-        10,
-        'Table should set cell value for column alias.'
-    );
-    assert.strictEqual(
-        table.getCell('population', table.getRowIndexBy('id', 'Our Land')),
-        table.getCell('x', table.getRowIndexBy('id', 'Our Land')),
-        'Table should return cell value for column name and alias.'
-    );
-
-    assert.ok(
-        table.setRows(
-            [{
-                id: 'All Land',
-                population: 4
-            }],
-            table.getRowIndexBy('id', 'All Land')
-        ),
-        'Table should insert a new row with cell values.'
-    )
-
-    // Insert new column with two cells more than the current row count
-    const colArray = [
-        'Tourmalet',
-        'Du Fromage',
-        'des Montagnes',
-        'Ventoux',
-        'Grand Cucheron',
-        'des Aravis'
-    ];
-
-    table.setColumn('Cols', colArray);
-
-    assert.strictEqual(
-        table.getRowCount(),
-        colArray.length,
-        'Table should count inserted rows.'
-    );
-
-    assert.ok(
-        table.deleteColumns(['Cols']),
-        'Table should have deleted column. (1)'
-    );
-
-    assert.strictEqual(
-        typeof table.getColumns(['Cols']).Cols,
-        'undefined',
-        'Table should have deleted column. (2)'
-    );
-
-    const expectedValues = table.getColumns(['population']);
-    assert.deepEqual(
-        table.deleteColumns(['population']),
-        expectedValues,
-        'Table should return cell values of deleted column.'
-    );
-
-    assert.ok(
-        typeof table.getColumn('population'),
-        'undefined',
-        'Table should have removed column "population".'
-    )
+            // Insert new column with two cells more than the current row count
+            return table
+                .setColumn('Cols', colArray)
+                .then((table) => {
+                    assert.strictEqual(
+                        table.getRowCount(),
+                        colArray.length,
+                        'Table should count inserted rows.'
+                    );
+                    return table;
+                });
+        })
+        .then((table) =>
+            table
+                .deleteColumns(['Cols'])
+                .then((column) => {
+                    assert.ok(
+                        column,
+                        'Table should have deleted column. (1)'
+                    );
+                    assert.strictEqual(
+                        typeof table.getColumns(['Cols']).Cols,
+                        'undefined',
+                        'Table should have deleted column. (2)'
+                    );
+                    return table;
+                })
+        )
+        .then((table) => {
+            const expectedValues = table.getColumns(['population']);
+            return table
+                .deleteColumns(['population'])
+                .then((receivedValues) => {
+                    assert.deepEqual(
+                        receivedValues,
+                        expectedValues,
+                        'Table should return cell values of deleted column.'
+                    );
+                    assert.ok(
+                        typeof table.getColumn('population'),
+                        'undefined',
+                        'Table should have removed column "population".'
+                    );
+                    return table;
+                });
+        })
+        .catch((e) =>
+            assert.notOk(true, e)
+        )
+        .then(() =>
+            done()
+        );
 
 });
 
 QUnit.test('DataTable Column Rename', function (assert) {
-    const table = new DataTable({
-        column1: [ true ],
-        existingColumn: [ true ]
-    });
+    const done = assert.async();
 
-    // Move
-    assert.ok(
-        table.renameColumn('column1', 'newColumn'),
-        'Table should move cells of a column to a new column.'
-    );
-    assert.deepEqual(
-        table.getColumns(['column1', 'newColumn']),
-        { newColumn: [true] },
-        'Table should only return renamed column.'
-    );
-
-    // Force move
-    assert.ok(
-        table.renameColumn('newColumn', 'existingColumn'),
-        'Table should move cell of a column to an existing column (with force).'
-    );
-    assert.deepEqual(
-        table.getColumns(['newColumn', 'existingColumn']),
-        { existingColumn: [true] }
-    );
-
-    // Force move following alias
-    table.setColumn('newColumn', []);
-    table.setColumnAlias('existingColumnAlias', 'newEmptyColumn');
-
-    assert.ok(
-        table.renameColumn('existingColumn', 'existingColumnAlias'),
-        'Table should rename column to an alias.'
-    );
-    assert.deepEqual(
-        table.getColumns([ 'existingColumn', 'existingColumnAlias' ]),
-        { existingColumnAlias: [ true ] },
-        'Table should retrieve only renamed column.'
-    );
-
-    // fail when trying to move an non existing column
-    table.setColumn('existingColumn', [ true ])
-
-    assert.notOk(
-        table.renameColumn('nonexistant', 'existingColumn'),
-        'Table should fail when trying to move a non-existant column.'
-    );
-
-    assert.deepEqual(
-        table.getColumns(['nonexistant', 'existingColumn']),
-        { existingColumn: [true] },
-        'Table should retrieve only existing column.'
-    );
+    DataPromise
+        .resolve(new DataTable({
+            column1: [ true ],
+            existingColumn: [ true ]
+        }))
+        .then((table) =>
+            table
+                .renameColumn('column1', 'newColumn')
+                .then((result) => {
+                    assert.ok(
+                        result,
+                        'Table should move cells of a column to a new column.'
+                    );
+                    return table;
+                })
+        )
+        .then((table) => {
+            assert.deepEqual(
+                table.getColumns(['column1', 'newColumn']),
+                { newColumn: [true] },
+                'Table should only return renamed column.'
+            );
+            return table;
+        })
+        .then((table) =>
+            table
+                .renameColumn('newColumn', 'existingColumn')
+                .then((result) => {
+                    // Force move
+                    assert.ok(
+                        result,
+                        'Table should move cell of a column to an existing column (with force).'
+                    );
+                    assert.deepEqual(
+                        table.getColumns(['newColumn', 'existingColumn']),
+                        { existingColumn: [true] }
+                    );
+                    return table;
+                })
+        )
+        .then((table) =>
+            // Force move following alias
+            table.setColumn('newColumn', [])
+        )
+        .then((table) =>
+            table
+                .setColumnAlias('existingColumnAlias', 'newEmptyColumn')
+                .then(() =>
+                    table
+                )
+        )
+        .then((table) =>
+            table
+                .renameColumn('existingColumn', 'existingColumnAlias')
+                .then((result) => {
+                    assert.ok(
+                        result,
+                        'Table should rename column to an alias.'
+                    );
+                    return table;
+                })
+        )
+        .then((table) => {
+            assert.deepEqual(
+                table.getColumns([ 'existingColumn', 'existingColumnAlias' ]),
+                { existingColumnAlias: [ true ] },
+                'Table should retrieve only renamed column.'
+            );
+            return table;
+        })
+        .then((table) =>
+            // fail when trying to move an non existing column
+            table.setColumn('existingColumn', [ true ])
+        )
+        .then((table) =>
+            table
+                .renameColumn('nonexistant', 'existingColumn')
+                .then((result) => {
+                    assert.notOk(
+                        result,
+                        'Table should fail when trying to move a non-existant column.'
+                    );
+                    return table;
+                })
+        )
+        .then((table) => {
+            assert.deepEqual(
+                table.getColumns(['nonexistant', 'existingColumn']),
+                { existingColumn: [true] },
+                'Table should retrieve only existing column.'
+            );
+            return table;
+        })
+        .catch((e) =>
+            assert.notOk(true, e)
+        )
+        .then(() =>
+            done()
+        );
 
 });
 
 QUnit.test('DataTable Column Retrieve', function (assert) {
+
     const table = new DataTable({
             id: [ 0, 1 ],
             a: [ 'a0', 'a1' ],
@@ -259,7 +413,9 @@ QUnit.test('DataTable Column Retrieve', function (assert) {
 });
 
 QUnit.test('DataTable Events', function (assert) {
-    const registeredEvents = [];
+
+    const done = assert.async(),
+        registeredEvents = [];
 
     /** @param {DataTable.EventObject} e */
     function registerEvent(e) {
@@ -282,14 +438,15 @@ QUnit.test('DataTable Events', function (assert) {
         }
     }
 
-    const table = new DataTable({
-        id: [ 'a' ],
-        text: [ 'text' ]
-    });
-
-    registerTable(table);
-
-    registeredEvents.length = 0;
+    DataPromise
+        .resolve(new DataTable({
+            id: [ 'a' ],
+            text: [ 'text' ]
+        }))
+        .then((table) => {
+            registerTable(table);
+            registeredEvents.length = 0;
+            return table;
     table.setRows([
         ['b', 'text'],
         {

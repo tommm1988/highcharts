@@ -17,9 +17,14 @@
  * */
 
 /**
- * Contains all possible types of the class registry.
+ * All possible keys of the class registry.
  */
-export type ModifierType = ModifierTypeRegistry[keyof ModifierTypeRegistry];
+export type ModifierName = keyof ModifierTypeRegistry;
+
+/**
+ * All possible types of the class registry.
+ */
+export type ModifierType = ModifierTypeRegistry[ModifierName];
 
 /**
  * Describes the class registry as a record object with class name and their
