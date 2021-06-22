@@ -10,23 +10,37 @@
 
 'use strict';
 
+/* *
+ *
+ *  Imports
+ *
+ * */
+
 import type {
     AlignValue,
     VerticalAlignValue
 } from '../../Core/Renderer/AlignObject';
 import type AnimationOptions from '../../Core/Animation/AnimationOptions';
-import type { AxisType } from '../../Core/Axis/Types';
+import type { AnnotationTypeRegistry } from './Types/AnnotationType';
+import type AST from '../../Core/Renderer/HTML/AST';
+import type AxisType from '../../Core/Axis/AxisType';
 import type BBoxObject from '../../Core/Renderer/BBoxObject';
 import type ColorString from '../../Core/Color/ColorString';
 import type ColorType from '../../Core/Color/ColorType';
 import type CSSObject from '../../Core/Renderer/CSSObject';
 import type DashStyleValue from '../../Core/Renderer/DashStyleValue';
 import type { DataLabelOverflowValue } from '../../Core/Series/DataLabelOptions';
+import type EventCallback from '../../Core/EventCallback';
+import type FormatUtilities from '../../Core/FormatUtilities';
+import type MockPointOptions from './MockPointOptions';
+import type Options from '../../Core/Options';
 import type Point from '../../Core/Series/Point';
 import type Series from '../../Core/Series/Series';
 import type ShadowOptionsObject from '../../Core/Renderer/ShadowOptionsObject';
 import type SVGElement from '../../Core/Renderer/SVG/SVGElement';
 import type SVGPath from '../../Core/Renderer/SVG/SVGPath';
+import type { SymbolKey } from '../../Core/Renderer/SVG/SymbolType';
+
 import A from '../../Core/Animation/AnimationUtilities.js';
 const { getDeferredAnimation } = A;
 import Chart from '../../Core/Chart/Chart.js';
@@ -43,6 +57,7 @@ import H from '../../Core/Globals.js';
 import MockPoint from './MockPoint.js';
 import Pointer from '../../Core/Pointer.js';
 import U from '../../Core/Utilities.js';
+import palette from '../../Core/Color/Palette.js';
 const {
     addEvent,
     defined,
@@ -56,6 +71,26 @@ const {
     splat,
     wrap
 } = U;
+
+/* *
+ *
+ * Declarations
+ *
+ * */
+declare module './MockPointOptions' {
+    interface MockPointOptions {
+        x: number;
+        xAxis?: (number|AxisType|null);
+        y: number;
+        yAxis?: (number|AxisType|null);
+    }
+}
+
+declare module '../../Core/Options'{
+    interface Options {
+        annotations?: (Highcharts.AnnotationsOptions|Array<Highcharts.AnnotationsOptions>);
+    }
+}
 
 /**
  * Internal types.
@@ -75,7 +110,7 @@ declare global {
         }
         interface AnnotationChartOptionsObject extends Options {
             annotations: Array<AnnotationsOptions>;
-            defs: Record<string, ASTNode>;
+            defs: Record<string, AST.Node>;
             navigation: NavigationOptions;
         }
         interface AnnotationControlPointEventsOptionsObject {
@@ -88,7 +123,7 @@ declare global {
             index?: number;
             positioner: AnnotationControlPointPositionerFunction;
             style: CSSObject;
-            symbol: string;
+            symbol: SymbolKey;
             visible: boolean;
             width: number;
         }
@@ -98,12 +133,6 @@ declare global {
             ControllableCircle|ControllableImage|ControllablePath|
             ControllableRect
         );
-        interface AnnotationMockPointOptionsObject {
-            x: number;
-            xAxis?: (number|AxisType|null);
-            y: number;
-            yAxis?: (number|AxisType|null);
-        }
         interface AnnotationPoint extends Point {
             series: AnnotationSeries;
         }
@@ -112,10 +141,10 @@ declare global {
             points: Array<AnnotationPoint>;
         }
         interface AnnotationsEventsOptions {
-            afterUpdate?: EventCallbackFunction<Annotation>;
-            add?: EventCallbackFunction<Annotation>;
-            click?: EventCallbackFunction<Annotation>;
-            remove?: EventCallbackFunction<Annotation>;
+            afterUpdate?: EventCallback<Annotation>;
+            add?: EventCallback<Annotation>;
+            click?: EventCallback<Annotation>;
+            remove?: EventCallback<Annotation>;
         }
         interface AnnotationsLabelOptions extends AnnotationControllableOptionsObject {
             align: AlignValue;
@@ -128,12 +157,12 @@ declare global {
             crop: boolean;
             distance?: number;
             format?: string;
-            formatter: FormatterCallbackFunction<Point>;
+            formatter: FormatUtilities.FormatterCallback<Point>;
             includeInDataExport: boolean;
             overflow: DataLabelOverflowValue;
             padding: number;
             shadow: (boolean|Partial<ShadowOptionsObject>);
-            shape: SymbolKeyValue;
+            shape: SymbolKey;
             style: CSSObject;
             text?: string;
             type?: string;
@@ -146,11 +175,13 @@ declare global {
             color?: ColorType;
             dashStyle?: DashStyleValue;
             // formatter: FormatterCallbackFunction<T>;
-            point?: (string|AnnotationMockPointOptionsObject);
+            point?: (string|MockPointOptions);
             itemType?: string;
             vertical?: VerticalAlignValue;
+            xAxis?: number|string;
+            yAxis?: number|string;
         }
-        interface AnnotationsOptions extends AnnotationControllableOptionsObject {
+        interface AnnotationsOptions extends AnnotationControllableOptionsObject { // @todo AnnotationOptions.d.ts
             animation: Partial<AnimationOptions>;
             controlPointOptions: AnnotationControlPointOptionsObject;
             draggable: AnnotationDraggableValue;
@@ -182,15 +213,15 @@ declare global {
         interface AnnotationsShapesOptions extends AnnotationsShapeOptions {
             markerEnd?: string;
             markerStart?: string;
-            point?: (string|AnnotationMockPointOptionsObject);
-            points?: Array<(string|AnnotationMockPointOptionsObject)>;
+            point?: (string|MockPointOptions);
+            points?: Array<(string|MockPointOptions)>;
         }
         interface AnnotationsTypeOptions {
-            background?: AnnotationsShapeOptions;
+            background?: Highcharts.AnnotationsShapeOptions;
             height?: number;
-            line?: AnnotationsShapeOptions;
-            point: AnnotationMockPointOptionsObject;
-            points?: Array<AnnotationsTypePointsOptions>;
+            line?: Highcharts.AnnotationsShapeOptions;
+            point: MockPointOptions;
+            points?: Array<Highcharts.AnnotationsTypePointsOptions>;
             xAxis?: number;
             yAxis?: number;
         }
@@ -201,18 +232,12 @@ declare global {
             y?: number;
             yAxis?: number;
         }
-        interface AnnotationTypesRegistry {
-            [key: string]: typeof Annotation;
-        }
         function extendAnnotation<T extends typeof Annotation>(
             Constructor: T,
             BaseConstructor: (Function|null),
             prototype: Partial<T['prototype']>,
             defaultOptions?: DeepPartial<T['prototype']['options']>
         ): void;
-        interface Options {
-            annotations?: (AnnotationsOptions|Array<AnnotationsOptions>);
-        }
     }
 }
 
@@ -297,7 +322,7 @@ class Annotation implements EventEmitterMixin.Type, ControllableMixin.Type {
     /**
      * @private
      */
-    public static types = {} as Highcharts.AnnotationTypesRegistry;
+    public static types = {} as AnnotationTypeRegistry;
 
     /* *
      *
@@ -309,7 +334,7 @@ class Annotation implements EventEmitterMixin.Type, ControllableMixin.Type {
         chart: Highcharts.AnnotationChart,
         userOptions: Highcharts.AnnotationsOptions
     ) {
-        var labelsAndShapes;
+        let labelsAndShapes;
 
         /**
          * The chart that the annotation belongs to.
@@ -470,7 +495,7 @@ class Annotation implements EventEmitterMixin.Type, ControllableMixin.Type {
         baseOptions: Highcharts.AnnotationsOptions,
         newOptions: DeepPartial<Highcharts.AnnotationsOptions>
     ): Highcharts.AnnotationsOptions {
-        var mergedOptions = {} as Highcharts.AnnotationsOptions;
+        const mergedOptions = {} as Highcharts.AnnotationsOptions;
 
         (['labels', 'shapes'] as Array<('labels'|'shapes')>).forEach(function (name: ('labels'|'shapes')): void {
             if (baseOptions[name]) {
@@ -494,7 +519,7 @@ class Annotation implements EventEmitterMixin.Type, ControllableMixin.Type {
             shapeOptions: Highcharts.AnnotationsShapesOptions,
             i: number
         ): void {
-            var shape = this.initShape(shapeOptions, i);
+            const shape = this.initShape(shapeOptions, i);
 
             merge(true, this.options.shapes[i], shape.options);
         }, this);
@@ -506,7 +531,7 @@ class Annotation implements EventEmitterMixin.Type, ControllableMixin.Type {
             labelsOptions: Highcharts.AnnotationsLabelsOptions,
             i: number
         ): void {
-            var labels = this.initLabel(labelsOptions, i);
+            const labels = this.initLabel(labelsOptions, i);
 
             merge(true, this.options.labels[i], labels.options);
         }, this);
@@ -521,7 +546,7 @@ class Annotation implements EventEmitterMixin.Type, ControllableMixin.Type {
     }
 
     public setClipAxes(): void {
-        var xAxes = this.chart.xAxis,
+        const xAxes = this.chart.xAxis,
             yAxes = this.chart.yAxis,
             linkedAxes: Array<AxisType> = ((
                 this.options.labels || []
@@ -564,7 +589,7 @@ class Annotation implements EventEmitterMixin.Type, ControllableMixin.Type {
     }
 
     public setLabelCollector(): void {
-        var annotation = this;
+        const annotation = this;
 
         annotation.labelCollector = function (): Array<SVGElement> {
             return annotation.labels.reduce(
@@ -623,7 +648,7 @@ class Annotation implements EventEmitterMixin.Type, ControllableMixin.Type {
         items: Array<Highcharts.AnnotationControllable>,
         animation?: boolean
     ): void {
-        var i = items.length;
+        let i = items.length;
 
         // needs a backward loop
         // labels/shapes array might be modified
@@ -640,7 +665,7 @@ class Annotation implements EventEmitterMixin.Type, ControllableMixin.Type {
     public renderItems(
         items: Array<Highcharts.AnnotationControllable>
     ): void {
-        var i = items.length;
+        let i = items.length;
 
         while (i--) {
             this.renderItem(items[i]);
@@ -648,7 +673,7 @@ class Annotation implements EventEmitterMixin.Type, ControllableMixin.Type {
     }
 
     public render(): void {
-        var renderer = this.chart.renderer;
+        const renderer = this.chart.renderer;
 
         this.graphic = renderer
             .g('annotation')
@@ -698,7 +723,7 @@ class Annotation implements EventEmitterMixin.Type, ControllableMixin.Type {
      * annotation's visibility is toggled.
      */
     public setVisibility(visible?: boolean): void {
-        var options = this.options,
+        const options = this.options,
             visibility = pick(visible, !options.visible);
 
         this.graphic.attr(
@@ -714,7 +739,7 @@ class Annotation implements EventEmitterMixin.Type, ControllableMixin.Type {
     }
 
     public setControlPointsVisibility(visible: boolean): void {
-        var setItemControlPointsVisibility = function (
+        const setItemControlPointsVisibility = function (
             item: (Highcharts.AnnotationLabelType|Highcharts.AnnotationShapeType)
         ): void {
             item.setControlPointsVisibility(visible);
@@ -737,7 +762,7 @@ class Annotation implements EventEmitterMixin.Type, ControllableMixin.Type {
      * @private
      */
     public destroy(): void {
-        var chart = this.chart,
+        const chart = this.chart,
             destroyItem = function (
                 item: (Highcharts.AnnotationLabelType|Highcharts.AnnotationShapeType)
             ): void {
@@ -781,7 +806,7 @@ class Annotation implements EventEmitterMixin.Type, ControllableMixin.Type {
         userOptions: DeepPartial<Highcharts.AnnotationsOptions>,
         redraw? : boolean
     ): void {
-        var chart = this.chart,
+        const chart = this.chart,
             labelsAndShapes = this.getLabelsAndShapesOptions(
                 this.userOptions,
                 userOptions
@@ -821,7 +846,7 @@ class Annotation implements EventEmitterMixin.Type, ControllableMixin.Type {
         shapeOptions: Partial<Highcharts.AnnotationsShapesOptions>,
         index: number
     ): Highcharts.AnnotationShapeType {
-        var options = merge(
+        const options = merge(
                 this.options.shapeOptions,
                 {
                     controlPointOptions: this.options.controlPointOptions
@@ -849,7 +874,7 @@ class Annotation implements EventEmitterMixin.Type, ControllableMixin.Type {
         labelOptions: Partial<Highcharts.AnnotationsLabelsOptions>,
         index: number
     ): Highcharts.AnnotationLabelType {
-        var options = merge(
+        const options = merge(
                 this.options.labelOptions,
                 {
                     controlPointOptions: this.options.controlPointOptions
@@ -907,7 +932,7 @@ class Annotation implements EventEmitterMixin.Type, ControllableMixin.Type {
     public adjustVisibility(
         item: Highcharts.AnnotationControllable
     ): void { // #9481
-        var hasVisiblePoints = false,
+        let hasVisiblePoints = false,
             label = item.graphic;
 
         item.points.forEach(function (point: Highcharts.AnnotationPointType): void {
@@ -1106,7 +1131,7 @@ merge<Annotation>(
                      *
                      * @type {Highcharts.ColorString}
                      */
-                    borderColor: 'black',
+                    borderColor: palette.neutralColor100,
 
                     /**
                      * The border radius in pixels for the annotaiton's label.
@@ -1132,7 +1157,7 @@ merge<Annotation>(
                      *
                      * @since 6.0.5
                      */
-                    className: '',
+                    className: 'highcharts-no-tooltip',
 
                     /**
                      * Whether to hide the annotation's label
@@ -1570,9 +1595,9 @@ merge<Annotation>(
                     width: 10,
                     height: 10,
                     style: {
-                        stroke: 'black',
+                        stroke: palette.neutralColor100,
                         'stroke-width': 2,
-                        fill: 'white'
+                        fill: palette.backgroundColor
                     },
                     visible: false,
                     events: {}
@@ -1653,7 +1678,7 @@ extend(chartProto, /** @lends Highcharts.Chart# */ {
         this: Highcharts.AnnotationChart,
         userOptions: Highcharts.AnnotationsOptions
     ): Annotation {
-        var Constructor = (Annotation as any).types[(userOptions as any).type] || Annotation,
+        const Constructor = (Annotation as any).types[(userOptions as any).type] || Annotation,
             annotation = new Constructor(this, userOptions);
 
         this.annotations.push(annotation);
@@ -1675,7 +1700,7 @@ extend(chartProto, /** @lends Highcharts.Chart# */ {
         userOptions: Highcharts.AnnotationsOptions,
         redraw?: boolean
     ): Annotation {
-        var annotation = this.initAnnotation(userOptions);
+        const annotation = this.initAnnotation(userOptions);
 
         this.options.annotations.push(annotation.options);
 
@@ -1699,7 +1724,7 @@ extend(chartProto, /** @lends Highcharts.Chart# */ {
         this: Highcharts.AnnotationChart,
         idOrAnnotation: (number|string|Annotation)
     ): void {
-        var annotations = this.annotations,
+        const annotations = this.annotations,
             annotation: Annotation = (idOrAnnotation as any).coll === 'annotations' ?
                 idOrAnnotation :
                 find(
@@ -1790,7 +1815,11 @@ chartProto.callbacks.push(function (
             // If second row doesn't have xValues
             // then it is a title row thus multiple level header is in use.
             multiLevelHeaders = !event.dataRows[1].xValues,
-            annotationHeader = chart.options.lang?.exportData?.annotationHeader,
+            annotationHeader = (
+                chart.options.lang &&
+                chart.options.lang.exportData &&
+                chart.options.lang.exportData.annotationHeader
+            ),
             columnHeaderFormatter = function (index: any): any {
                 let s;
                 if (csvColumnHeaderFormatter) {
@@ -1812,8 +1841,18 @@ chartProto.callbacks.push(function (
                 return s;
             },
             startRowLength = event.dataRows[0].length,
-            annotationSeparator = chart.options.exporting?.csv?.annotations?.itemDelimiter,
-            joinAnnotations = chart.options.exporting?.csv?.annotations?.join;
+            annotationSeparator = (
+                chart.options.exporting &&
+                chart.options.exporting.csv &&
+                chart.options.exporting.csv.annotations &&
+                chart.options.exporting.csv.annotations.itemDelimiter
+            ),
+            joinAnnotations = (
+                chart.options.exporting &&
+                chart.options.exporting.csv &&
+                chart.options.exporting.csv.annotations &&
+                chart.options.exporting.csv.annotations.join
+            );
 
         annotations.forEach((annotation): void => {
 

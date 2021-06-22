@@ -28,8 +28,9 @@ Highcharts.setOptions({
 });
 
 const container = document.getElementById('container');
+const parents = [];
 
-function getSize() {
+function resize(el) {
     const width = container.offsetWidth;
     let size = width / 4 - 20;
     if (width < 400) {
@@ -40,10 +41,13 @@ function getSize() {
         size = width / 3 - 20;
     }
 
-    return size;
+    el.style.width = size + 'px';
+    el.style.height = size * 0.7 + 'px';
 }
 
-const size = getSize();
+function resizeAll() {
+    parents.forEach(resize);
+}
 
 const kpi = [{
     title: 'Cake',
@@ -109,19 +113,21 @@ const kpi = [{
             clip: false
         }]
     }
-}].map(config => new KPIComponent({
-    parentElement: container,
-    dimensions: {
-        width: size,
-        height: size * 0.7
-    },
-    ...config
-}).render());
-
-window.addEventListener('resize', () => {
-    const size = getSize();
-    kpi.forEach(c => c.resize(size, size * 0.7));
+}].map(config => {
+    const parentElement = document.createElement('div');
+    parents.push(parentElement);
+    container.appendChild(parentElement);
+    resize(parentElement);
+    return new KPIComponent({
+        parentElement,
+        ...config
+    }).render();
 });
+
+requestAnimationFrame(() => {
+    kpi.forEach((k, i) => k.resizeTo(parents[i]));
+});
+window.addEventListener('resize', resizeAll);
 
 function random(max, min = 0) {
     return Math.floor(min + Math.random() * (max - min));

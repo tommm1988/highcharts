@@ -14,6 +14,8 @@ parameters:
 defaults: &defaults
   executor: node_image
   working_directory: /home/circleci/repo/highcharts
+  environment:
+    CYPRESS_CACHE_FOLDER: /home/circleci/repo/highcharts/.cache
 
 persist_workspace: &persist_workspace
   - persist_to_workspace:
@@ -67,6 +69,8 @@ commands:
 jobs:
   checkout_and_install:
     <<: *defaults
+    environment:
+      CYPRESS_INSTALL_BINARY: 0 # skip installing the Cypress binary on npm install
     steps:
       # rather than using the checkout keyword we checkout via commandline
       # to avoid a huge and slow checkout depth
@@ -89,10 +93,10 @@ jobs:
          keys:
            - npm-deps-{{ .Environment.HIGHCHARTS_CACHE_VERSION }}-{{ .Branch }}-{{ checksum "package.json" }}
            - npm-deps-{{ .Environment.HIGHCHARTS_CACHE_VERSION }}-{{ .Branch }}
-     - run: npm install --quiet
+     - run: npm ci --quiet --cache .npm --prefer-offline
      - save_cache:
          paths:
-           - /home/circleci/repo/highcharts/node_modules
+           - /home/circleci/repo/highcharts/.npm
          key: npm-deps-{{ .Environment.HIGHCHARTS_CACHE_VERSION }}-{{ .Branch }}-{{ checksum "package.json" }}
      - run: npm run gulp scripts
      - run: git diff --name-only --exit-code || (echo "Untracked files found. Did you forget to commit any transpiled files? Failing build now as this likely will trigger errors later in the build.." && exit 1)
@@ -151,6 +155,39 @@ jobs:
     steps:
       - <<: *load_workspace
       - run: ./.circleci/scripts/test_timezones.sh -b=<<parameters.browsers>>
+
+  test_cypress:
+    <<: *defaults
+    description: Run Cypress tests
+    steps:
+      - << : *load_workspace
+      - restore_cache:
+          name: Restore cached Cypress binary
+          key: cypress-cache-{{ checksum "package-lock.json" }}
+      - run:
+          name: Install Cypress
+          description: Will install Cypress if cached version is not found
+          command: npx cypress install
+      - save_cache:
+          name: Caching Cypress binary
+          key: cypress-cache-{{ checksum "package-lock.json" }}
+          paths:
+            - /home/circleci/repo/highcharts/.cache
+      - run:
+          name: Run utils in background
+          command: sudo npx highcharts-utils
+          background: true
+      - run: npx cypress info
+      - run:
+          name: Run cypress tests (Chrome)
+          command: npx cypress run --browser chrome --headless
+      - run:
+          name: Run cypress tests (Firefox)
+          command: npx cypress run --browser firefox --headless
+      - store_artifacts:
+          path: cypress/videos
+      - store_artifacts:
+          path: cypress/screenshots
 
   check_for_docs_changes_and_deploy:
     <<: *defaults
@@ -227,13 +264,13 @@ jobs:
       - run: > # checkout master at diverge point of current branch and install
           git checkout master && git fetch origin master && git reset --hard origin/master &&
           git checkout $(git merge-base master ${CIRCLE_BRANCH}) && git log --oneline -5 &&
-          npm i && npx gulp scripts
+          npm ci --quiet --cache .npm --prefer-offline && npx gulp scripts
       - run:
           name: Write file sizes at master
           command: npx gulp write-file-sizes --filename master.json
       - generate_references_command:
           browsercount: 2
-      - run: git checkout ${CIRCLE_BRANCH}  && git log --oneline -5 && npm i && npx gulp scripts
+      - run: git checkout ${CIRCLE_BRANCH}  && git log --oneline -5 && npm ci --quiet --cache .npm --prefer-offline && npx gulp scripts
       - run:
           name: File size comparison
           command: |
@@ -437,6 +474,8 @@ workflows:
             tags:
               only: /^v\d+(?:\.\d+)+?$/
           context: highcharts-staging
+      - test_cypress:
+          requires: [lint]
       - test_timezones:
           requires: [lint]
           filters:
@@ -547,6 +586,7 @@ workflows:
           notify_on_failure: true
       - build_dist:
           requires: [checkout_and_install, "test-Win.IE8"]
+          context: highcharts-staging
       - deploy_code:
           requires: [build_dist]
           context: highcharts-staging
@@ -563,6 +603,7 @@ workflows:
       # Trigger samples/demo updates
       - check_for_samples_changes_and_deploy:
           requires: [build_dist]
+          context: highcharts-staging
           filters:
             branches:
               only: [master]

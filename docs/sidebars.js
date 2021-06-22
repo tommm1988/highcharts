@@ -26,13 +26,13 @@ module.exports = {
             'chart-concepts/labels-and-string-formatting',
             'chart-concepts/drilldown',
             'chart-concepts/3d-charts',
-            'chart-concepts/responsive'
+            'chart-concepts/responsive',
+            'chart-concepts/security'
         ],
         'Stock': [
             'stock/understanding-highcharts-stock',
             'stock/stock-tools',
             'stock/candlestick-chart',
-            'stock/custom-technical-indicators',
             'stock/data-grouping',
             'stock/depth-chart',
             'stock/flag-series',

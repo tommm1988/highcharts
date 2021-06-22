@@ -15,8 +15,9 @@ import type { StatesOptionsKey } from '../../Core/Series/StatesOptions';
 import type SVGAttributes from '../../Core/Renderer/SVG/SVGAttributes';
 import type SVGPath from '../../Core/Renderer/SVG/SVGPath';
 import type WaterfallSeriesOptions from './WaterfallSeriesOptions';
+
+import Axis from '../../Core/Axis/Axis.js';
 import Chart from '../../Core/Chart/Chart.js';
-import H from '../../Core/Globals.js';
 import palette from '../../Core/Color/Palette.js';
 import Point from '../../Core/Series/Point.js';
 import SeriesRegistry from '../../Core/Series/SeriesRegistry.js';
@@ -51,7 +52,7 @@ declare module '../../Core/Series/SeriesLike' {
     }
 }
 
-import '../../Core/Options.js';
+import '../../Core/DefaultOptions.js';
 
 /**
  * Returns true if the key is a direct property of the object.
@@ -210,7 +211,7 @@ class WaterfallSeries extends ColumnSeries {
      * */
     // After generating points, set y-values for all sums.
     public generatePoints(): void {
-        var point,
+        let point,
             len,
             i,
             y: number;
@@ -231,7 +232,7 @@ class WaterfallSeries extends ColumnSeries {
 
     // Translate data points from raw values
     public translate(): void {
-        var series = this,
+        let series = this,
             options = series.options,
             yAxis = series.yAxis,
             len,
@@ -515,7 +516,7 @@ class WaterfallSeries extends ColumnSeries {
     public processData(
         force?: boolean
     ): undefined {
-        var series = this,
+        let series = this,
             options = series.options,
             yData = series.yData,
             // #3710 Update point does not propagate to sum
@@ -596,7 +597,7 @@ class WaterfallSeries extends ColumnSeries {
         state: StatesOptionsKey
     ): SVGAttributes {
 
-        var upColor = this.options.upColor,
+        let upColor = this.options.upColor,
             attr: SVGAttributes;
 
         // Set or reset up color (#3710, update to negative)
@@ -630,7 +631,7 @@ class WaterfallSeries extends ColumnSeries {
         this: WaterfallSeries
     ): SVGPath {
 
-        var data = this.data,
+        let data = this.data,
             yAxis = this.yAxis,
             length = data.length,
             graphNormalizer =
@@ -732,7 +733,7 @@ class WaterfallSeries extends ColumnSeries {
 
     // Waterfall has stacking along the x-values too.
     public setStackedPoints(): void {
-        var series = this,
+        let series = this,
             options = series.options,
             waterfallStacks = series.yAxis.waterfall.stacks,
             seriesThreshold = options.threshold,
@@ -806,7 +807,7 @@ class WaterfallSeries extends ColumnSeries {
             }
 
             actualStack = waterfallStacks[stackKey];
-            for (var i = 0; i < xLength; i++) {
+            for (let i = 0; i < xLength; i++) {
                 x = xData[i];
                 if (!(actualStack as any)[x] || changed) {
                     (actualStack as any)[x] = {
@@ -891,7 +892,7 @@ class WaterfallSeries extends ColumnSeries {
     // Extremes for a non-stacked series are recorded in processData.
     // In case of stacking, use Series.stackedYData to calculate extremes.
     public getExtremes(): DataExtremesObject {
-        var stacking = this.options.stacking,
+        let stacking = this.options.stacking,
             yAxis,
             waterfallStacks,
             stackedYNeg,
@@ -979,7 +980,7 @@ declare module '../../Core/Series/SeriesType' {
     }
 }
 SeriesRegistry.registerSeriesType('waterfall', WaterfallSeries);
-WaterfallAxis.compose(H.Axis, Chart);
+WaterfallAxis.compose(Axis, Chart);
 
 /* *
  *

@@ -185,6 +185,8 @@ function (assert) {
         controller = new TestController(chart),
         button = chart.stockTools.listWrapper.childNodes[0].childNodes[0];
 
+    chart.stockTools.wrapper.style.display = 'none';
+
     // Show croshair with the label.
     controller.moveTo(200, 200);
     assert.strictEqual(
@@ -317,6 +319,13 @@ QUnit.test('The lastPrice color, #15074.', function (assert) {
         chart.series[0].lastPrice.attr('stroke'),
         '#00ff00',
         'The lastPrice color should remain the same after toggle.'
+    );
+
+    assert.ok(
+        chart.series[0].lastPrice.element.classList
+            .contains('highcharts-color-0'),
+        'CSS class of highcharts-color-{x} ' +
+            'should be added to lastPrice (#15222)'
     );
 });
 

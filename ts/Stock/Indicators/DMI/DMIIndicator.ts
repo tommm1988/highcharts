@@ -1,7 +1,7 @@
 /* *
  *  (c) 2010-2021 Rafal Sebestjanski
  *
- *  Directional Movement Index (DMI) indicator for Highstock
+ *  Directional Movement Index (DMI) indicator for Highcharts Stock
  *
  *  License: www.highcharts.com/license
  *
@@ -65,7 +65,7 @@ class DMIIndicator extends SMAIndicator {
      *         DMI indicator
      *
      * @extends      plotOptions.sma
-     * @since        next
+     * @since 9.1.0
      * @product      highstock
      * @excluding    allAreas, colorAxis, joinBy, keys, navigatorOptions,
      *               pointInterval, pointIntervalUnit, pointPlacement,
@@ -79,8 +79,7 @@ class DMIIndicator extends SMAIndicator {
          * @excluding index
          */
         params: {
-            index: void 0, // DMI has unchangeable index
-            period: 14
+            index: void 0 // unused index, do not inherit (#15362)
         },
         marker: {
             enabled: false
@@ -110,7 +109,7 @@ class DMIIndicator extends SMAIndicator {
                  *
                  * @type {Highcharts.ColorString}
                  */
-                lineColor: palette.colors[2] // green-ish
+                lineColor: palette.positiveColor // green-ish
             }
         },
         /**
@@ -130,7 +129,7 @@ class DMIIndicator extends SMAIndicator {
                  *
                  * @type {Highcharts.ColorString}
                  */
-                lineColor: palette.colors[5] // red-ish
+                lineColor: palette.negativeColor // red-ish
             }
         },
         dataGrouping: {
@@ -383,7 +382,7 @@ export default DMIIndicator;
  * specified, it is inherited from [chart.type](#chart.type).
  *
  * @extends   series,plotOptions.dmi
- * @since     next
+ * @since 9.1.0
  * @product   highstock
  * @excluding allAreas, colorAxis,  dataParser, dataURL, joinBy, keys,
  *            navigatorOptions, pointInterval, pointIntervalUnit,

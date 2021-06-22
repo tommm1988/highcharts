@@ -16,8 +16,8 @@
 
 'use strict';
 
+import type LangOptions from '../Core/LangOptions';
 import type Point from '../Core/Series/Point';
-import type SVGAttributes from '../Core/Renderer/SVG/SVGAttributes';
 import type {
     PointOptions,
     PointShortOptions
@@ -33,6 +33,11 @@ const {
     seriesTypes,
     win
 } = H;
+import D from '../Core/DefaultOptions.js';
+const {
+    getOptions,
+    setOptions
+} = D;
 import U from '../Core/Utilities.js';
 const {
     addEvent,
@@ -40,10 +45,8 @@ const {
     extend,
     find,
     fireEvent,
-    getOptions,
     isNumber,
-    pick,
-    setOptions
+    pick
 } = U;
 
 declare module '../Core/Chart/ChartLike'{
@@ -62,7 +65,7 @@ declare module '../Core/Chart/ChartLike'{
         /** @requires modules/export-data */
         getTable(useLocalDecimalPoint?: boolean): string;
         /** @requires modules/export-data */
-        getTableAST(useLocalDecimalPoint?: boolean): Highcharts.ASTNode;
+        getTableAST(useLocalDecimalPoint?: boolean): AST.Node;
         /** @requires modules/export-data */
         setUpKeyToAxis(): void;
         /** @requires modules/export-data */
@@ -73,6 +76,16 @@ declare module '../Core/Chart/ChartLike'{
         hideData(): void;
         /** @requires modules/export-data */
         isDataTableVisible: boolean;
+    }
+}
+
+declare module '../Core/LangOptions'{
+    interface LangOptions {
+        downloadCSV?: string;
+        downloadXLS?: string;
+        exportData?: Highcharts.ExportDataOptions;
+        viewData?: string;
+        hideData?: string;
     }
 }
 
@@ -134,13 +147,6 @@ declare global {
             categoryHeader?: string;
             categoryDatetimeHeader?: string;
         }
-        interface LangOptions {
-            downloadCSV?: string;
-            downloadXLS?: string;
-            exportData?: ExportDataOptions;
-            viewData?: string;
-            hideData?: string;
-        }
     }
     interface MSBlobBuilder extends Blob {
     }
@@ -179,24 +185,6 @@ declare global {
 import DownloadURL from '../Extensions/DownloadURL.js';
 import HTMLAttributes from '../Core/Renderer/HTML/HTMLAttributes';
 const { downloadURL } = DownloadURL;
-
-
-// Can we add this to utils? Also used in screen-reader.js
-/**
- * HTML encode some characters vulnerable for XSS.
- * @private
- * @param  {string} html The input string
- * @return {string} The excaped string
- */
-function htmlencode(html: string): string {
-    return html
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#x27;')
-        .replace(/\//g, '&#x2F;');
-}
 
 setOptions({
     /**
@@ -255,7 +243,7 @@ setOptions({
          * converter, as demonstrated in the sample below.
          *
          * @sample  highcharts/export-data/categorized/ Categorized data
-         * @sample  highcharts/export-data/stock-timeaxis/ Highstock time axis
+         * @sample  highcharts/export-data/stock-timeaxis/ Highcharts Stock time axis
          * @sample  highcharts/export-data/xlsx/
          *          Using a third party XLSX converter
          *
@@ -523,12 +511,12 @@ Chart.prototype.setUpKeyToAxis = function (): void {
 Chart.prototype.getDataRows = function (
     multiLevelHeaders?: boolean
 ): Array<Array<(number|string)>> {
-    var hasParallelCoords = this.hasParallelCoordinates,
+    let hasParallelCoords = this.hasParallelCoordinates,
         time = this.time,
         csvOptions = (
             (this.options.exporting && this.options.exporting.csv) || {}
         ),
-        xAxis: Highcharts.Axis,
+        xAxis: Axis,
         xAxes = this.xAxis,
         rows: Record<string, (Array<any>&AnyRecord)> =
             {},
@@ -540,7 +528,7 @@ Chart.prototype.getDataRows = function (
         i: number,
         x,
         xTitle: string,
-        langOptions: Highcharts.LangOptions = this.options.lang as any,
+        langOptions: LangOptions = this.options.lang as any,
         exportDataOptions: Highcharts.ExportDataOptions = langOptions.exportData as any,
         categoryHeader = exportDataOptions.categoryHeader as any,
         categoryDatetimeHeader = exportDataOptions.categoryDatetimeHeader,
@@ -551,7 +539,7 @@ Chart.prototype.getDataRows = function (
             keyLength?: number
         ): (string|Record<string, string>) {
             if (csvOptions.columnHeaderFormatter) {
-                var s = csvOptions.columnHeaderFormatter(item, key, keyLength);
+                const s = csvOptions.columnHeaderFormatter(item, key, keyLength);
 
                 if (s !== false) {
                     return s;
@@ -584,11 +572,11 @@ Chart.prototype.getDataRows = function (
             pointArrayMap: Array<string>,
             pIdx?: number
         ): Highcharts.ExportingCategoryDateTimeMap {
-            var categoryMap: Highcharts.ExportingCategoryMap = {},
+            const categoryMap: Highcharts.ExportingCategoryMap = {},
                 dateTimeValueAxisMap: Highcharts.ExportingDateTimeMap = {};
 
             pointArrayMap.forEach(function (prop: string): void {
-                var axisName = (
+                const axisName = (
                         (series.keyToAxis && series.keyToAxis[prop]) ||
                         prop
                     ) + 'Axis',
@@ -615,7 +603,7 @@ Chart.prototype.getDataRows = function (
         // or point.name is defined #13293
         getPointArray = function (
             series: Series,
-            xAxis: Highcharts.Axis
+            xAxis: Axis
         ): string[] {
             const namedPoints = series.data.filter((d): string | false =>
                 (typeof d.y !== 'undefined') && d.name
@@ -646,14 +634,14 @@ Chart.prototype.getDataRows = function (
     this.setUpKeyToAxis();
 
     this.series.forEach(function (series: Series): void {
-        var keys = series.options.keys,
+        const keys = series.options.keys,
             xAxis = series.xAxis,
             pointArrayMap = keys || getPointArray(series, xAxis),
             valueCount = pointArrayMap.length,
             xTaken: (false|Record<string, unknown>) =
                 !series.requireSorting && {},
-            xAxisIndex = xAxes.indexOf(xAxis),
-            categoryAndDatetimeMap = getCategoryAndDateTimeMap(
+            xAxisIndex = xAxes.indexOf(xAxis);
+        let categoryAndDatetimeMap = getCategoryAndDateTimeMap(
                 series,
                 pointArrayMap
             ),
@@ -714,7 +702,7 @@ Chart.prototype.getDataRows = function (
                 options: (PointOptions|PointShortOptions),
                 pIdx: number
             ): void {
-                var key: (number|string),
+                let key: (number|string),
                     prop: string,
                     val: number,
                     name: (string|undefined),
@@ -794,7 +782,7 @@ Chart.prototype.getDataRows = function (
         }
     }
 
-    var xAxisIndex: number, column: number;
+    let xAxisIndex: number, column: number;
 
     // Add computed column headers and top level headers to final row set
     dataRows = multiLevelHeaders ? [topLevelColumnTitles, columnTitles] :
@@ -827,7 +815,7 @@ Chart.prototype.getDataRows = function (
         rowArr.forEach(function ( // eslint-disable-line no-loop-func
             row: AnyRecord
         ): void {
-            var category = row.name;
+            let category = row.name;
 
             if (xAxis && !defined(category)) {
                 if (xAxis.dateTime) {
@@ -876,8 +864,8 @@ Chart.prototype.getDataRows = function (
 Chart.prototype.getCSV = function (
     useLocalDecimalPoint?: boolean
 ): string {
-    var csv = '',
-        rows = this.getDataRows(),
+    let csv = '';
+    const rows = this.getDataRows(),
         csvOptions: Highcharts.ExportingCsvOptions =
             (this.options.exporting as any).csv,
         decimalPoint = pick(
@@ -896,7 +884,7 @@ Chart.prototype.getCSV = function (
 
     // Transform the rows to CSV
     rows.forEach(function (row: Array<(number|string)>, i: number): void {
-        var val: (number|string) = '',
+        let val: (number|string) = '',
             j = row.length;
 
         while (j--) {
@@ -944,7 +932,7 @@ Chart.prototype.getCSV = function (
 Chart.prototype.getTable = function (
     useLocalDecimalPoint?: boolean
 ): string {
-    const serialize = (node: Highcharts.ASTNode): string => {
+    const serialize = (node: AST.Node): string => {
         if (!node.tagName || node.tagName === '#text') {
             // Text node
             return node.textContent || '';
@@ -992,15 +980,15 @@ Chart.prototype.getTable = function (
  */
 Chart.prototype.getTableAST = function (
     useLocalDecimalPoint?: boolean
-): Highcharts.ASTNode {
-    const treeChildren: Highcharts.ASTNode[] = [];
-    var options = this.options,
+): AST.Node {
+    let rowLength = 0;
+    const treeChildren: AST.Node[] = [];
+    const options = this.options,
         decimalPoint = useLocalDecimalPoint ? (1.1).toLocaleString()[1] : '.',
         useMultiLevelHeaders = pick(
             (options.exporting as any).useMultiLevelHeaders, true
         ),
         rows = this.getDataRows(useMultiLevelHeaders),
-        rowLength = 0,
         topHeaders = useMultiLevelHeaders ? rows.shift() : null,
         subHeaders = rows.shift(),
         // Compare two rows for equality
@@ -1008,7 +996,7 @@ Chart.prototype.getTableAST = function (
             row1: Array<(number|string)>,
             row2: Array<(number|string)>
         ): boolean {
-            var i = row1.length;
+            let i = row1.length;
 
             if (row2.length === i) {
                 while (i--) {
@@ -1027,8 +1015,8 @@ Chart.prototype.getTableAST = function (
             classes: (string|null),
             attributes: HTMLAttributes,
             value: (number|string)
-        ): Highcharts.ASTNode {
-            var textContent = pick(value, ''),
+        ): AST.Node {
+            let textContent = pick(value, ''),
                 className = 'text' + (classes ? ' ' + classes : '');
 
             // Convert to string if number
@@ -1059,10 +1047,10 @@ Chart.prototype.getTableAST = function (
             topheaders: (Array<(number|string)>|null|undefined),
             subheaders: Array<(number|string)>,
             rowLength?: number
-        ): Highcharts.ASTNode {
-            const theadChildren: Highcharts.ASTNode[] = [];
+        ): AST.Node {
+            const theadChildren: AST.Node[] = [];
 
-            var i = 0,
+            let i = 0,
                 len = rowLength || subheaders && subheaders.length,
                 next,
                 cur,
@@ -1170,7 +1158,7 @@ Chart.prototype.getTableAST = function (
                 (options.exporting as any).tableCaption,
                 (
                     (options.title as any).text ?
-                        htmlencode((options.title as any).text) :
+                        (options.title as any).text :
                         'Chart'
                 )
             )
@@ -1178,7 +1166,7 @@ Chart.prototype.getTableAST = function (
     }
 
     // Find longest row
-    for (var i = 0, len = rows.length; i < len; ++i) {
+    for (let i = 0, len = rows.length; i < len; ++i) {
         if (rows[i].length > rowLength) {
             rowLength = rows[i].length;
         }
@@ -1192,10 +1180,10 @@ Chart.prototype.getTableAST = function (
     ));
 
     // Transform the rows to HTML
-    const trs: Highcharts.ASTNode[] = [];
+    const trs: AST.Node[] = [];
     rows.forEach(function (row: Array<(number|string)>): void {
         const trChildren = [];
-        for (var j = 0; j < rowLength; j++) {
+        for (let j = 0; j < rowLength; j++) {
             // Make first column a header too. Especially important for
             // category axes, but also might make sense for datetime? Should
             // await user feedback on this.
@@ -1221,7 +1209,7 @@ Chart.prototype.getTableAST = function (
             tagName: 'table',
             id: `highcharts-data-table-${this.index}`,
             children: treeChildren
-        } as Highcharts.ASTNode
+        } as AST.Node
     };
     fireEvent(this, 'aftergetTableAST', e);
 
@@ -1244,7 +1232,7 @@ function getBlobFromContent(
     content: string,
     type: string
 ): (string|undefined) {
-    var nav = win.navigator,
+    const nav = win.navigator,
         webKit = (
             nav.userAgent.indexOf('WebKit') > -1 &&
             nav.userAgent.indexOf('Chrome') < 0
@@ -1254,7 +1242,7 @@ function getBlobFromContent(
     try {
         // MS specific
         if (nav.msSaveOrOpenBlob && win.MSBlobBuilder) {
-            var blob = new win.MSBlobBuilder();
+            const blob = new win.MSBlobBuilder();
             blob.append(content);
             return blob.getBlob('image/svg+xml') as any;
         }
@@ -1284,7 +1272,7 @@ function getBlobFromContent(
  * @requires modules/exporting
  */
 Chart.prototype.downloadCSV = function (): void {
-    var csv = this.getCSV(true);
+    const csv = this.getCSV(true);
 
     downloadURL(
         getBlobFromContent(csv, 'text/csv') ||
@@ -1304,7 +1292,7 @@ Chart.prototype.downloadCSV = function (): void {
  * @requires modules/exporting
  */
 Chart.prototype.downloadXLS = function (): void {
-    var uri = 'data:application/vnd.ms-excel;base64,',
+    const uri = 'data:application/vnd.ms-excel;base64,',
         template = '<html xmlns:o="urn:schemas-microsoft-com:office:office" ' +
             'xmlns:x="urn:schemas-microsoft-com:office:excel" ' +
             'xmlns="http://www.w3.org/TR/REC-html40">' +
@@ -1397,7 +1385,8 @@ Chart.prototype.toggleDataTable = function (show?: boolean): void {
     if (
         exportingOptions &&
         exportingOptions.menuItemDefinitions &&
-        lang?.viewData &&
+        lang &&
+        lang.viewData &&
         lang.hideData &&
         menuItems &&
         exportDivElements &&

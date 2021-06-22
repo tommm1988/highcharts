@@ -10,6 +10,8 @@
  *
  * */
 
+'use strict';
+
 /* *
  *
  *  Imports
@@ -29,8 +31,10 @@ const { merge } = U;
 
 /**
  * Handles parsing and transforming CSV to a table.
+ *
+ * @private
  */
-class CSVParser extends DataParser<DataParser.EventObject> {
+class CSVParser extends DataParser<DataParser.Event> {
 
     /* *
      *
@@ -143,7 +147,7 @@ class CSVParser extends DataParser<DataParser.EventObject> {
 
         parser.columns = [];
 
-        parser.emit<DataParser.EventObject>({
+        parser.emit<DataParser.Event>({
             type: 'parse',
             columns: parser.columns,
             detail: eventDetail,
@@ -188,7 +192,7 @@ class CSVParser extends DataParser<DataParser.EventObject> {
                 startRow++;
             }
 
-            var offset = 0;
+            let offset = 0;
 
             for (rowIt = startRow; rowIt <= endRow; rowIt++) {
                 if (lines[rowIt][0] === '#') {
@@ -224,7 +228,7 @@ class CSVParser extends DataParser<DataParser.EventObject> {
             }
         }
 
-        parser.emit<DataParser.EventObject>({
+        parser.emit<DataParser.Event>({
             type: 'afterParse',
             columns: parser.columns,
             detail: eventDetail,
@@ -389,7 +393,7 @@ class CSVParser extends DataParser<DataParser.EventObject> {
     private guessDelimiter(lines: Array<string>): string {
 
         const { decimalPoint } = this.options;
-        var points = 0,
+        let points = 0,
             commas = 0,
             guessed: string;
         const potDelimiters: Record<string, number> = {
@@ -400,7 +404,7 @@ class CSVParser extends DataParser<DataParser.EventObject> {
             linesCount = lines.length;
 
         for (let i = 0; i < linesCount; i++) {
-            var inStr = false,
+            let inStr = false,
                 c,
                 cn,
                 cl,
@@ -412,7 +416,7 @@ class CSVParser extends DataParser<DataParser.EventObject> {
             }
 
             const columnStr = lines[i];
-            for (var j = 0; j < columnStr.length; j++) {
+            for (let j = 0; j < columnStr.length; j++) {
                 c = columnStr[j];
                 cn = columnStr[j + 1];
                 cl = columnStr[j - 1];

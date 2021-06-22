@@ -1,3 +1,4 @@
+/* eslint-disable */
 import type { CSSJSONObject } from './../../Data/DataCSSObject';
 import type DataJSON from '../../Data/DataJSON';
 import DashboardGlobals from './../DashboardGlobals.js';
@@ -5,9 +6,12 @@ import Layout from './Layout.js';
 import Cell from './Cell.js';
 import GUIElement from './GUIElement.js';
 import U from '../../Core/Utilities.js';
+import { HTMLDOMElement } from '../../Core/Renderer/DOMElementType';
 const {
     pick,
-    merge
+    defined,
+    merge,
+    fireEvent
 } = U;
 class Row extends GUIElement {
     /* *
@@ -43,6 +47,15 @@ class Row extends GUIElement {
 
         return void 0;
     }
+
+    public static setContainerHeight(
+        rowContainer: HTMLDOMElement,
+        height?: number | string
+    ): void {
+        if (height) {
+            rowContainer.style.height = height + 'px';
+        }
+    }
     /* *
     *
     *  Constructor
@@ -68,9 +81,11 @@ class Row extends GUIElement {
     ) {
         super();
 
+        this.type = DashboardGlobals.guiElementType.row;
         this.layout = layout;
         this.cells = [];
         this.options = options;
+        this.isVisible = true;
 
         // Get parent container
         const parentContainer =
@@ -220,6 +235,12 @@ class Row extends GUIElement {
             cell = new Cell(row, options, cellElement);
 
         row.cells.push(cell);
+
+        // Set editMode events.
+        if (row.layout.dashboard.editMode) {
+            row.layout.dashboard.editMode.setCellEvents(cell);
+        }
+
         return cell;
     }
 
@@ -229,13 +250,23 @@ class Row extends GUIElement {
      */
     public destroy(): void {
         const row = this;
+        const { layout } = row;
 
         // Destroy cells.
         for (let i = 0, iEnd = row.cells.length; i < iEnd; ++i) {
-            row.cells[i].destroy();
+            if (row.cells[i]) {
+                row.cells[i].destroy();
+            }
         }
 
+        row.layout.unmountRow(row);
+        const destroyLayout = layout.rows.length === 0;
+
         super.destroy();
+
+        if (destroyLayout) {
+            layout.destroy();
+        }
     }
 
     /**
@@ -263,6 +294,112 @@ class Row extends GUIElement {
                 style: row.options.style
             }
         };
+    }
+
+    public setSize(
+        height?: number | string
+    ): void {
+        const cells = this.cells;
+
+        Row.setContainerHeight(
+            this.container as HTMLDOMElement,
+            height
+        );
+
+        // redraw component inside the cell
+        if (cells) {
+            /* for (let i = 0, iEnd = cells.length; i < iEnd; ++i) { */
+            /*     if (cells[i] && cells[i].mountedComponent) { */
+            /*         (cells[i] as any).mountedComponent.resize(null); */
+            /*     } */
+            /* } */
+        } else {
+            // nested layouts
+        }
+    }
+
+    // Get cell index from the row.cells array.
+    public getCellIndex(
+        cell: Cell
+    ): number | undefined {
+        for (let i = 0, iEnd = this.cells.length; i < iEnd; ++i) {
+            if (this.cells[i].id === cell.id) {
+                return i;
+            }
+        }
+    }
+
+    // Add cell to the row.cells array and move cell container.
+    public mountCell(
+        cell: Cell,
+        index: number = 0
+    ): void {
+        const row = this,
+            nextCell = row.cells[index],
+            prevCell = row.cells[index - 1];
+
+        if (cell.container) {
+            if (nextCell && nextCell.container) {
+                nextCell.container.parentNode.insertBefore(cell.container, nextCell.container);
+            } else if (prevCell && prevCell.container) {
+                prevCell.container.parentNode.insertBefore(cell.container, prevCell.container.nextSibling);
+            } else if (!prevCell && !nextCell && row.container) {
+                row.container.appendChild(cell.container);
+            }
+
+            row.cells.splice(index, 0, cell);
+            cell.row = row;
+            setTimeout(() => {
+                fireEvent(row, 'cellChange', { row, cell })
+            }, 0);
+        }
+    }
+
+    // Remove cell from the row.cells array.
+    public unmountCell(
+        cell: Cell
+    ): void {
+        const cellIndex = this.getCellIndex(cell);
+
+        if (defined(cellIndex)) {
+            this.cells.splice(cellIndex, 1);
+        }
+
+        setTimeout(() => {
+            fireEvent(this, 'cellChange', { row: this, cell })
+        }, 0);
+    }
+
+    public getVisibleCells(): Array<Cell> {
+        const cells = [];
+
+        for (let i = 0, iEnd = this.cells.length; i < iEnd; ++i) {
+            if (this.cells[i].isVisible) {
+                cells.push(this.cells[i]);
+            }
+        }
+
+        return cells;
+    }
+
+    protected changeVisibility(
+        setVisible: boolean = true,
+        displayStyle?: string
+    ): void {
+        const row = this;
+
+        super.changeVisibility(setVisible, displayStyle);
+
+        // Change layout visibility if needed.
+        if (!row.layout.getVisibleRows().length) {
+            row.layout.hide();
+        } else if (row.isVisible && !row.layout.isVisible) {
+            row.layout.show();
+        }
+    }
+
+    public show(): void {
+        this.changeVisibility(true, 'flex');
     }
 }
 

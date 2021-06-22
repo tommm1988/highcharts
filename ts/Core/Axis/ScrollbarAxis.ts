@@ -8,9 +8,18 @@
  *
  * */
 
+'use strict';
+
+/* *
+ *
+ *  Imports
+ *
+ * */
+
 import type Axis from './Axis';
 import type Scrollbar from '../Scrollbar';
-import H from '../Globals.js';
+import type ScrollbarOptions from '../ScrollbarOptions';
+
 import U from '../Utilities.js';
 const {
     addEvent,
@@ -18,23 +27,34 @@ const {
     pick
 } = U;
 
-/**
- * @private
- */
-declare module './Types' {
+/* *
+ *
+ *  Declarations
+ *
+ * */
+
+declare module './AxisComposition' {
     interface AxisComposition {
         scrollbar?: ScrollbarAxis['scrollbar'];
     }
+}
+
+declare module './AxisType' {
     interface AxisTypeRegistry {
         ScrollbarAxis: ScrollbarAxis;
     }
 }
 
+/* *
+ *
+ *  Composition
+ *
+ * */
+
 /* eslint-disable no-invalid-this, valid-jsdoc */
 
 /**
  * Creates scrollbars if enabled.
- *
  * @private
  */
 class ScrollbarAxis {
@@ -50,7 +70,7 @@ class ScrollbarAxis {
      * @param ScrollbarClass
      * Scrollbar class to use.
      */
-    public static compose(AxisClass: typeof Axis, ScrollbarClass: typeof Scrollbar): void {
+    public static compose<T extends typeof Axis>(AxisClass: T, ScrollbarClass: typeof Scrollbar): (T&ScrollbarAxis) {
         const getExtremes = (axis: ScrollbarAxis): Record<string, number> => {
             const axisMin = pick(
                 axis.options && axis.options.min,
@@ -82,7 +102,7 @@ class ScrollbarAxis {
 
         // Wrap axis initialization and create scrollbar if enabled:
         addEvent(AxisClass, 'afterInit', function (): void {
-            var axis = this as ScrollbarAxis;
+            const axis = this as ScrollbarAxis;
 
             if (
                 axis.options &&
@@ -99,11 +119,10 @@ class ScrollbarAxis {
                     axis.chart
                 );
 
-                addEvent(axis.scrollbar as any, 'changed', function (
-                    this: Highcharts.Scrollbar,
-                    e: Highcharts.ScrollbarChangedEventObject
+                addEvent(axis.scrollbar, 'changed', function (
+                    e: Scrollbar.ChangedEvent
                 ): void {
-                    var {
+                    let {
                             axisMin,
                             axisMax,
                             scrollMin: unitedMin,
@@ -150,7 +169,7 @@ class ScrollbarAxis {
 
         // Wrap rendering axis, and update scrollbar if one is created:
         addEvent(AxisClass, 'afterRender', function (): void {
-            var axis = this as ScrollbarAxis,
+            let axis = this as ScrollbarAxis,
                 {
                     scrollMin,
                     scrollMax
@@ -244,7 +263,7 @@ class ScrollbarAxis {
 
         // Make space for a scrollbar:
         addEvent(AxisClass, 'afterGetOffset', function (): void {
-            var axis = this as ScrollbarAxis,
+            const axis = this as ScrollbarAxis,
                 index = axis.horiz ? 2 : 1,
                 scrollbar = axis.scrollbar;
 
@@ -255,18 +274,19 @@ class ScrollbarAxis {
             }
         });
 
+        return AxisClass as (T&ScrollbarAxis);
     }
 }
 
 interface ScrollbarAxis extends Axis {
-    options: Axis['options'] & ScrollbarAxis.AxisOptions;
+    options: Axis['options'] & ScrollbarAxis.Options;
     scrollbar: Scrollbar;
 }
 
 namespace ScrollbarAxis {
 
-    export interface AxisOptions {
-        scrollbar?: Highcharts.ScrollbarOptions;
+    export interface Options {
+        scrollbar?: ScrollbarOptions;
     }
 
 }

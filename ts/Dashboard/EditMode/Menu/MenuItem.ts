@@ -36,7 +36,7 @@ class MenuItem {
         this.options = merge(MenuItem.defaultOptions, options || {});
 
         this.container = this.setContainer();
-        this.setInnerElement();
+        this.innerElement = this.setInnerElement();
     }
 
     /* *
@@ -47,6 +47,7 @@ class MenuItem {
     public menu: Menu;
     public options: MenuItem.Options;
     public container: HTMLDOMElement;
+    public innerElement?: HTMLDOMElement;
     public isActive: boolean;
 
     /* *
@@ -55,15 +56,32 @@ class MenuItem {
     *
     * */
     private setContainer(): HTMLDOMElement {
+        const item = this,
+            options = item.options;
+
+        let className = EditGlobals.classNames.menuItem;
+
+        if (item.menu.options.itemsClassName) {
+            className += ' ' + item.menu.options.itemsClassName;
+        }
+
+        if (options.className) {
+            className += ' ' + options.className;
+        }
+
         return createElement(
             'div',
-            { className: EditGlobals.classNames.menuItem },
-            this.options.style || {},
+            { className: className },
+            merge(
+                this.options.style || {},
+                // to remove
+                this.isActive ? { display: 'block' } : {}
+            ),
             this.menu.container
         );
     }
 
-    public setInnerElement(): void {
+    public setInnerElement(): HTMLDOMElement|undefined {
         const item = this,
             options = item.options,
             callback = function (): void {
@@ -74,18 +92,53 @@ class MenuItem {
 
         let element;
 
-        if (item.options.type === 'switcher') {
-            element = EditRenderer.renderSwitcher(
+        if (options.type === 'toggle') {
+            element = EditRenderer.renderToggle(
                 item.container,
-                callback
+                {
+                    id: options.id,
+                    name: options.id,
+                    title: options.text || '',
+                    callback: callback
+                }
             );
-        } else if (item.options.type === 'icon' && options.icon) {
+        } else if (options.type === 'icon' && options.icon) {
             element = EditRenderer.renderIcon(
                 item.container,
                 options.icon,
                 callback
             );
-        } else {
+
+            // Temp.
+            if (element && options.events && options.events.onmousedown) {
+                element.onmousedown = function (): void {
+                    if (options.events && options.events.onmousedown) {
+                        options.events.onmousedown.apply(item, arguments);
+                    }
+                };
+            }
+        } else if (options.type === 'textarea') {
+            element = EditRenderer.renderTextarea(
+                item.container,
+                {
+                    id: options.id,
+                    name: options.id,
+                    title: options.text || '',
+                    value: options.value || ''
+                }
+            );
+        } else if (options.type === 'input') {
+            element = EditRenderer.renderInput(
+                item.container,
+                {
+                    id: options.id,
+                    name: options.id,
+                    callback: void 0,
+                    title: options.text,
+                    value: options.value || ''
+                }
+            );
+        } else if (options.type === 'text') {
             element = EditRenderer.renderText(
                 item.container,
                 options.text || '',
@@ -93,19 +146,22 @@ class MenuItem {
             );
         }
 
-        if (element) {
-            if (item.menu.options.itemsClassName) {
-                element.classList.add(item.menu.options.itemsClassName);
-            }
+        return element;
+    }
 
-            if (options.className) {
-                element.classList.add(options.className);
-            }
+    public update(): void {
+        const item = this,
+            options = item.options;
+
+        if (options.events && options.events.update) {
+            options.events.update.apply(item, arguments);
         }
     }
 
     public activate(): void {
         const item = this;
+
+        item.update();
 
         // Temp.
         if (item.container) {
@@ -134,6 +190,8 @@ namespace MenuItem {
         events?: Record<Event['type'], Function>;
         style?: CSSJSONObject;
         icon?: string;
+        isActive?: boolean;
+        value?: string;
     }
 }
 

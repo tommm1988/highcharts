@@ -10,6 +10,8 @@
  *
  * */
 
+'use strict';
+
 /* *
  *
  *  Imports
@@ -39,8 +41,10 @@ const {
 
 /**
  * Handles parsing and transformation of an Google Sheets to a table.
+ *
+ * @private
  */
-class GoogleSheetsParser extends DataParser<DataParser.EventObject> {
+class GoogleSheetsParser extends DataParser<DataParser.Event> {
 
     /* *
      *
@@ -240,8 +244,10 @@ class GoogleSheetsParser extends DataParser<DataParser.EventObject> {
         if (!cells || cells.length === 0) {
             return false;
         }
+        parser.headers = [];
+        parser.columns = [];
 
-        parser.emit<DataParser.EventObject>({
+        parser.emit<DataParser.Event>({
             type: 'parse',
             columns: parser.columns,
             detail: eventDetail,
@@ -251,9 +257,9 @@ class GoogleSheetsParser extends DataParser<DataParser.EventObject> {
         parser.columns = parser.getSheetColumns(json);
 
         for (let i = 0, iEnd = parser.columns.length; i < iEnd; i++) {
-            headers.push(parser.columns[i][0]?.toString() || uniqueKey());
-
             column = parser.columns[i];
+            parser.headers[i] = parserOptions.firstRowAsNames ? column.splice(0, 1).toString() : uniqueKey();
+
             for (let j = 0, jEnd = column.length; j < jEnd; ++j) {
                 if (column[j] && typeof column[j] === 'string') {
                     let cellValue = converter.asGuessedType(column[j] as string);
@@ -265,7 +271,7 @@ class GoogleSheetsParser extends DataParser<DataParser.EventObject> {
             }
         }
 
-        parser.emit<DataParser.EventObject>({
+        parser.emit<DataParser.Event>({
             type: 'afterParse',
             columns: parser.columns,
             detail: eventDetail,

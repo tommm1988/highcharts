@@ -10,6 +10,8 @@
  *
  * */
 
+'use strict';
+
 /* *
  *
  *  Imports
@@ -25,14 +27,19 @@ import H from '../../Core/Globals.js';
 const { win } = H;
 import HTMLTableParser from '../Parsers/HTMLTableParser.js';
 import U from '../../Core/Utilities.js';
-const { merge, objectEach } = U;
+const {
+    merge,
+    objectEach
+} = U;
 
 /** eslint-disable valid-jsdoc */
 
 /**
  * Class that handles creating a datastore from an HTML table
+ *
+ * @private
  */
-class HTMLTableStore extends DataStore<HTMLTableStore.EventObjects> implements DataJSON.Class {
+class HTMLTableStore extends DataStore<HTMLTableStore.Event> implements DataJSON.Class {
 
     /* *
      *
@@ -175,7 +182,7 @@ class HTMLTableStore extends DataStore<HTMLTableStore.EventObjects> implements D
         store.fetchTable();
 
         // If already loaded, clear the current rows
-        store.table.clear();
+        store.table.deleteColumns();
 
         store.emit({
             type: 'load',
@@ -231,7 +238,7 @@ class HTMLTableStore extends DataStore<HTMLTableStore.EventObjects> implements D
             row1: Array<(number | string | undefined)>,
             row2: Array<(number | string | undefined)>
         ): boolean {
-            var i = row1.length;
+            let i = row1.length;
 
             if (row2.length === i) {
                 while (i--) {
@@ -251,7 +258,7 @@ class HTMLTableStore extends DataStore<HTMLTableStore.EventObjects> implements D
             subheaders: Array<(number | string | undefined)>,
             rowLength?: number
         ): string {
-            var html = '<thead>',
+            let html = '<thead>',
                 i = 0,
                 len = rowLength || subheaders && subheaders.length,
                 next,
@@ -392,7 +399,7 @@ class HTMLTableStore extends DataStore<HTMLTableStore.EventObjects> implements D
             let columnDataType;
 
             if (columnMeta) {
-                columnDataType = columnMeta?.dataType;
+                columnDataType = columnMeta.dataType;
             }
 
             for (let rowIndex = 0; rowIndex < columnLength; rowIndex++) {
@@ -437,7 +444,7 @@ class HTMLTableStore extends DataStore<HTMLTableStore.EventObjects> implements D
         // Add table caption
         // Current exportdata falls back to chart title
         // but that should probably be handled elsewhere?
-        if (options?.tableCaption) {
+        if (options.tableCaption) {
             caption = '<caption class="highcharts-table-caption">' +
                 options.tableCaption +
                 '</caption>';
@@ -519,7 +526,7 @@ namespace HTMLTableStore {
     /**
      * Type for event object fired from HTMLTableDataStore
      */
-    export type EventObjects = (ErrorEventObject | LoadEventObject);
+    export type Event = (ErrorEvent|LoadEvent);
 
     /**
      * Options used in the constructor of HTMLTableDataStore
@@ -551,7 +558,7 @@ namespace HTMLTableStore {
     /**
      * Provided event object on errors within HTMLTableDataStore
      */
-    export interface ErrorEventObject extends DataStore.EventObject {
+    export interface ErrorEvent extends DataStore.Event {
         type: 'loadError';
         error: (string | Error);
     }
@@ -559,7 +566,7 @@ namespace HTMLTableStore {
     /**
      * Provided event object on load events within HTMLTableDataStore
      */
-    export interface LoadEventObject extends DataStore.EventObject {
+    export interface LoadEvent extends DataStore.Event {
         type: ('load' | 'afterLoad');
         tableElement?: (HTMLElement | null);
     }

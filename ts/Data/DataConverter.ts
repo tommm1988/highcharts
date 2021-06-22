@@ -10,6 +10,8 @@
  *
  * */
 
+'use strict';
+
 /* *
  *
  *  Imports
@@ -142,11 +144,13 @@ class DataConverter {
         'dd/mm/YY': {
             regex: /^([0-9]{1,2})[\-\/\.]([0-9]{1,2})[\-\/\.]([0-9]{2})$/,
             parser: function (match: (RegExpMatchArray|null)): number {
+                const d = new Date();
+
                 if (!match) {
                     return NaN;
                 }
-                var year = +match[3],
-                    d = new Date();
+
+                let year = +match[3];
 
                 if (year > (d.getFullYear() - 2000)) {
                     year += 1900;
@@ -454,6 +458,12 @@ class DataConverter {
                     // Timestamp
                 } else if (isNumber(match)) {
                     result = match - (new Date(match)).getTimezoneOffset() * 60000;
+                    if (// reset dates without year in Chrome
+                        value.indexOf('2001') === -1 &&
+                        (new Date(result)).getFullYear() === 2001
+                    ) {
+                        result = NaN;
+                    }
                 }
             }
         }

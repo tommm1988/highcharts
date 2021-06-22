@@ -1,3 +1,4 @@
+/* eslint-disable */
 import Row from './Row.js';
 import Dashboard from '../Dashboard.js';
 import GUIElement from './GUIElement.js';
@@ -7,9 +8,11 @@ import DashboardGlobals from './../DashboardGlobals.js';
 
 import U from '../../Core/Utilities.js';
 import Resizer from '../Actions/Resizer.js';
+import Cell from './Cell.js';
 
 const {
-    pick
+    pick,
+    defined
 } = U;
 
 class Layout extends GUIElement {
@@ -87,18 +90,29 @@ class Layout extends GUIElement {
      */
     public constructor(
         dashboard: Dashboard,
-        options: Layout.Options
+        options: Layout.Options,
+        parentCell?: Cell
     ) {
         super();
 
+        this.type = DashboardGlobals.guiElementType.layout;
         this.dashboard = dashboard;
         this.rows = [];
         this.options = options;
+        this.isVisible = true;
 
         // Get parent container
         const parentContainer = document.getElementById(
             options.parentContainerId || ''
         ) || dashboard.container;
+
+        // Set layout level.
+        if (parentCell) {
+            this.parentCell = parentCell;
+            this.level = parentCell.row.layout.level + 1;
+        } else {
+            this.level = 0;
+        }
 
         // GUI structure
         if (parentContainer) {
@@ -160,6 +174,10 @@ class Layout extends GUIElement {
 
     public copyId?: string;
 
+    public level: number;
+
+    public parentCell?: Cell;
+
     /* *
     *
     *  Functions
@@ -219,12 +237,23 @@ class Layout extends GUIElement {
      */
     public addRow(
         options: Row.Options,
-        rowElement?: HTMLElement
+        rowElement?: HTMLElement,
+        index?: number
     ): Row {
         const layout = this,
             row = new Row(layout, options, rowElement);
 
-        layout.rows.push(row);
+        if (!defined(index)) {
+            layout.rows.push(row);
+        } else {
+            layout.mountRow(row, index);
+        }
+
+        // Set editMode events.
+        if (layout.dashboard.editMode) {
+            layout.dashboard.editMode.setRowEvents(row);
+        }
+
         return row;
     }
 
@@ -240,6 +269,10 @@ class Layout extends GUIElement {
             layout.rows[i].destroy();
         }
 
+        if (layout.parentCell) {
+            layout.parentCell.destroy();
+        }
+
         super.destroy();
     }
 
@@ -251,6 +284,77 @@ class Layout extends GUIElement {
             DashboardGlobals.prefix + this.options.id,
             JSON.stringify(this.toJSON())
         );
+    }
+
+    // Get row index from the layout.rows array.
+    public getRowIndex(
+        row: Row
+    ): number | undefined {
+        for (let i = 0, iEnd = this.rows.length; i < iEnd; ++i) {
+            if (this.rows[i] === row) {
+                return i;
+            }
+        }
+    }
+
+    // Add cell to the layout.rows array and move row container.
+    public mountRow(
+        row: Row,
+        index: number
+    ): void {
+        const nextRow = this.rows[index],
+            prevRow = this.rows[index - 1];
+
+        if (row.container) {
+            if (nextRow && nextRow.container) {
+                nextRow.container.parentNode.insertBefore(row.container, nextRow.container);
+            } else if (prevRow && prevRow.container) {
+                prevRow.container.parentNode.insertBefore(row.container, prevRow.container.nextSibling);
+            }
+
+            this.rows.splice(index, 0, row);
+            row.layout = this;
+        }
+    }
+
+    // Remove row from the layout.rows array.
+    public unmountRow(
+        row: Row
+    ): void {
+        const rowIndex = this.getRowIndex(row);
+
+        if (defined(rowIndex)) {
+            this.rows.splice(rowIndex, 1);
+        }
+    }
+
+    public getVisibleRows(): Array<Row> {
+        const rows = [];
+
+        for (let i = 0, iEnd = this.rows.length; i < iEnd; ++i) {
+            if (this.rows[i].isVisible) {
+                rows.push(this.rows[i]);
+            }
+        }
+
+        return rows;
+    }
+
+    protected changeVisibility(
+        setVisible: boolean = true
+    ): void {
+        const layout = this;
+
+        super.changeVisibility(setVisible);
+
+        // Change parentCell visibility.
+        if (layout.parentCell) {
+            if (layout.isVisible && !layout.parentCell.isVisible) {
+                layout.parentCell.show();
+            } else if (!layout.isVisible && layout.parentCell.isVisible) {
+                layout.parentCell.hide();
+            }
+        }
     }
 
     /**

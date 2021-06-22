@@ -14,6 +14,45 @@ const {
 } = U;
 
 abstract class GUIElement {
+
+    /* *
+    *
+    *  Static Properties
+    *
+    * */
+
+    // Get offsets of the guiElement relative to
+    // the referenceElement or the Viewport.
+    public static getOffsets(
+        guiElement: GUIElement,
+        referenceElement?: HTMLDOMElement
+    ): Record<string, number> {
+        const offset = { left: 0, top: 0, right: 0, bottom: 0 };
+
+        if (guiElement.container) {
+            const guiElementClientRect = guiElement.container.getBoundingClientRect();
+            const referenceClientRect = referenceElement ?
+                referenceElement.getBoundingClientRect() : { left: 0, top: 0 };
+
+            offset.left = guiElementClientRect.left - referenceClientRect.left;
+            offset.top = guiElementClientRect.top - referenceClientRect.top;
+            offset.right = guiElementClientRect.right - referenceClientRect.left;
+            offset.bottom = guiElementClientRect.bottom - referenceClientRect.top;
+        }
+
+        return offset;
+    }
+
+    // Get dimensions of the guiElement container from offsets.
+    public static getDimFromOffsets(
+        offsets: Record<string, number>
+    ): Record<string, number> {
+        return {
+            width: offsets.right - offsets.left,
+            height: offsets.bottom - offsets.top
+        };
+    }
+
     /* *
     *
     *  Properties
@@ -26,10 +65,20 @@ abstract class GUIElement {
     public container?: HTMLDOMElement;
 
     /**
+     * The type of a GUIElement instance.
+     */
+    protected type?: GUIElement.GUIElementType;
+
+    /**
      * The function to remove bindedGUIElement
      * event on GUIElement container.
      */
     public removeBindedEventFn?: Function;
+
+    /**
+     * The visibility flag.
+     */
+    public isVisible?: boolean;
 
     /* *
     *
@@ -114,6 +163,33 @@ abstract class GUIElement {
         });
     }
 
+    /**
+     * Return the GUIElement instance type.
+     * @return {GUIElement.GUIElementType|undefined}
+     */
+    public getType(): GUIElement.GUIElementType|undefined {
+        return this.type;
+    }
+
+    protected changeVisibility(
+        setVisible: boolean = true,
+        displayStyle?: string
+    ): void {
+        const visibilityChanged = this.isVisible && !setVisible || !this.isVisible && setVisible;
+
+        if (this.container && visibilityChanged) {
+            this.container.style.display = setVisible ? (displayStyle || 'block') : 'none';
+            this.isVisible = setVisible;
+        }
+    }
+
+    public hide(): void {
+        this.changeVisibility(false);
+    }
+
+    public show(): void {
+        this.changeVisibility();
+    }
 }
 
 namespace GUIElement {
@@ -129,6 +205,8 @@ namespace GUIElement {
     export interface BindedGUIElementEvent extends Event {
         guiElement: GUIElement;
     }
+
+    export type GUIElementType = 'row'|'cell'|'layout';
 }
 
 export default GUIElement;

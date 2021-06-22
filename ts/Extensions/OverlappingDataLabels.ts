@@ -47,7 +47,7 @@ declare module '../Core/Chart/ChartLike'{
 // to be considered because they are usually accompanied by data labels that lie
 // inside the columns.
 addEvent(Chart, 'render', function collectAndHide(): void {
-    var chart = this,
+    let chart = this,
         labels: Array<SVGElement|undefined> = [];
 
     // Consider external label collectors
@@ -57,7 +57,7 @@ addEvent(Chart, 'render', function collectAndHide(): void {
         labels = labels.concat(collector());
     });
 
-    (this.yAxis || []).forEach(function (yAxis: Highcharts.Axis): void {
+    (this.yAxis || []).forEach(function (yAxis): void {
         if (
             yAxis.stacking &&
             yAxis.options.stackLabels &&
@@ -69,14 +69,19 @@ addEvent(Chart, 'render', function collectAndHide(): void {
                 objectEach(stack, function (
                     stackItem: Highcharts.StackItem
                 ): void {
-                    labels.push(stackItem.label);
+                    if (
+                        stackItem.label &&
+                        stackItem.label.visibility !== 'hidden' // #15607
+                    ) {
+                        labels.push(stackItem.label);
+                    }
                 });
             });
         }
     });
 
     (this.series || []).forEach(function (series): void {
-        var dlOptions: DataLabelOptions = (
+        const dlOptions: DataLabelOptions = (
             series.options.dataLabels as any
         );
 
@@ -87,7 +92,7 @@ addEvent(Chart, 'render', function collectAndHide(): void {
             const push = (points: Point[]): void =>
                 points.forEach((point: Point): void => {
                     if (point.visible) {
-                        var dataLabels = (
+                        const dataLabels = (
                             isArray(point.dataLabels) ?
                                 point.dataLabels :
                                 (point.dataLabel ? [point.dataLabel] : [])
@@ -96,7 +101,7 @@ addEvent(Chart, 'render', function collectAndHide(): void {
                         dataLabels.forEach(function (
                             label: SVGElement
                         ): void {
-                            var options = label.options;
+                            const options = label.options;
 
                             label.labelrank = pick(
                                 options.labelrank,
@@ -137,7 +142,7 @@ Chart.prototype.hideOverlappingLabels = function (
     labels: Array<SVGElement>
 ): void {
 
-    var chart = this,
+    let chart = this,
         len = labels.length,
         ren = chart.renderer,
         label,
@@ -165,7 +170,7 @@ Chart.prototype.hideOverlappingLabels = function (
         getAbsoluteBox = function (
             label: SVGElement
         ): (BBoxObject|undefined) {
-            var pos: PositionObject,
+            let pos: PositionObject,
                 parent: SVGElement,
                 bBox: BBoxObject,
                 // Substract the padding if no background or border (#4333)
@@ -294,7 +299,7 @@ Chart.prototype.hideOverlappingLabels = function (
  * @return {boolean}
  */
 function hideOrShow(label: SVGElement, chart: Chart): boolean {
-    var complete: (Function|undefined),
+    let complete: (Function|undefined),
         newOpacity: number,
         isLabelAffected = false;
 
@@ -311,7 +316,6 @@ function hideOrShow(label: SVGElement, chart: Chart): boolean {
                     if (!chart.styledMode) {
                         label.css({ pointerEvents: newOpacity ? 'auto' : 'none' });
                     }
-                    label.visibility = newOpacity ? 'inherit' : 'hidden';
                 };
 
                 isLabelAffected = true;

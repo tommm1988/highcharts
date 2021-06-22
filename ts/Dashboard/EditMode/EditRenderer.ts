@@ -1,6 +1,7 @@
 import EditMode from './EditMode.js';
 import EditGlobals from '../EditMode/EditGlobals.js';
 import U from '../../Core/Utilities.js';
+import type CSSObject from '../../Core/Renderer/CSSObject';
 import { HTMLDOMElement } from '../../Core/Renderer/DOMElementType.js';
 
 const {
@@ -31,7 +32,9 @@ class EditRenderer {
     *  Functions
     *
     * */
-    public renderContextButton(): HTMLDOMElement|undefined {
+    public renderContextButton(
+        parentNode: HTMLDOMElement
+    ): HTMLDOMElement|undefined {
         const editMode = this.editMode;
 
         let ctxBtnElement;
@@ -43,7 +46,7 @@ class EditRenderer {
                     onclick: function (): void {
                         editMode.onContextBtnClick(editMode);
                     }
-                }, {}, editMode.dashboard.container
+                }, {}, parentNode
             );
             ctxBtnElement.style.background = 'url(' +
                 editMode.options.contextMenu.icon +
@@ -82,36 +85,44 @@ class EditRenderer {
         return customSelect;
     }
 
-    public static renderSwitcher(
+    public static renderToggle(
         parentElement: HTMLDOMElement,
-        callback?: Function
+        options: FormField
     ): HTMLDOMElement|undefined {
-        let switcher;
+        let toggle;
 
         if (parentElement) {
-            switcher = createElement(
+
+            if (options.title) {
+                EditRenderer.renderText(
+                    parentElement,
+                    options.title
+                );
+            }
+
+            toggle = createElement(
                 'label',
                 {
-                    className: EditGlobals.classNames.switchWrapper
+                    className: EditGlobals.classNames.toggleWrapper
                 },
                 {},
                 parentElement
             );
 
-            EditRenderer.renderCheckbox(switcher);
+            EditRenderer.renderCheckbox(toggle);
 
             createElement(
                 'span',
                 {
-                    className: EditGlobals.classNames.switchSlider,
-                    onclick: callback
+                    className: EditGlobals.classNames.toggleSlider,
+                    onclick: options.callback
                 },
                 {},
-                switcher
+                toggle
             );
         }
 
-        return switcher;
+        return toggle;
     }
 
     public static renderText(
@@ -119,11 +130,12 @@ class EditRenderer {
         text: string,
         callback?: Function
     ): HTMLDOMElement|undefined {
-        let input;
+        let textElem;
 
         if (parentElement) {
-            input = createElement(
+            textElem = createElement(
                 'div', {
+                    className: EditGlobals.classNames.labelText,
                     textContent: text,
                     onclick: callback
                 }, {},
@@ -131,7 +143,7 @@ class EditRenderer {
             );
         }
 
-        return input;
+        return textElem;
     }
 
     public static renderIcon(
@@ -156,14 +168,26 @@ class EditRenderer {
     }
 
     public static renderInput(
-        parentElement: HTMLDOMElement
+        parentElement: HTMLDOMElement,
+        options: FormField
     ): HTMLDOMElement|undefined {
-        let input;
+        let input: HTMLDOMElement|undefined;
 
         if (parentElement) {
+            if (options.title) {
+                EditRenderer.renderText(
+                    parentElement,
+                    options.title
+                );
+            }
+
             input = createElement(
                 'input', {
-                    type: 'text'
+                    type: 'text',
+                    onclick: options.callback,
+                    id: options.id || '',
+                    name: options.name || '',
+                    value: (options.value && options.value.replace(/\"/g, '')) || ''
                 }, {
 
                 },
@@ -175,14 +199,25 @@ class EditRenderer {
     }
 
     public static renderTextarea(
-        parentElement: HTMLDOMElement
+        parentElement: HTMLDOMElement,
+        options: FormField
     ): HTMLDOMElement|undefined {
         let textarea;
 
         if (parentElement) {
+
+            if (options.title) {
+                EditRenderer.renderText(
+                    parentElement,
+                    options.title
+                );
+            }
+
             textarea = createElement(
                 'textarea', {
-
+                    id: options.id,
+                    name: options.name,
+                    value: options.value || ''
                 }, {
 
                 },
@@ -211,8 +246,49 @@ class EditRenderer {
 
         return input;
     }
+
+    public static renderButton(
+        parentElement: HTMLDOMElement,
+        options: ButtonOptions
+    ): HTMLDOMElement|undefined {
+        let button;
+
+        if (parentElement) {
+            button = createElement(
+                'button', {
+                    className: EditGlobals.classNames.button + ' ' + (options.className || ''),
+                    onclick: options.callback,
+                    textContent: options.value
+                }, options.style || {},
+                parentElement
+            );
+
+            if (options.icon) {
+                (button.style as any)['background-image'] = 'url(' + options.icon + ')';
+            }
+        }
+
+        return button;
+    }
 }
 
 namespace EditRenderer {}
+
+export interface ButtonOptions {
+    callback?: Function;
+    value?: string;
+    className?: string;
+    icon?: string;
+    isDisabled?: boolean;
+    style?: CSSObject;
+}
+
+export interface FormField {
+    id: string;
+    name: string;
+    callback?: Function;
+    title?: string;
+    value?: string;
+}
 
 export default EditRenderer;

@@ -16,17 +16,31 @@
  *
  * */
 
+import type {
+    AxisOptions,
+    YAxisOptions
+} from '../Axis/AxisOptions';
 import type BBoxObject from '../Renderer/BBoxObject';
 import type CSSObject from '../Renderer/CSSObject';
 import type DataExtremesObject from '../Series/DataExtremesObject';
 import type { HTMLDOMElement } from '../Renderer/DOMElementType';
+import type Options from '../Options';
 import type PointerEvent from '../PointerEvent';
 import type { SeriesTypePlotOptions } from '../Series/SeriesType';
 import type SVGElement from '../Renderer/SVG/SVGElement';
 import type SVGPath from '../Renderer/SVG/SVGPath';
+
+import A from '../Animation/AnimationUtilities.js';
+const {
+    animObject
+} = A;
 import Axis from '../Axis/Axis.js';
 import Chart from '../Chart/Chart.js';
-import palette from '../../Core/Color/Palette.js';
+import F from '../../Core/FormatUtilities.js';
+const { format } = F;
+import D from '../DefaultOptions.js';
+const { getOptions } = D;
+import Palette from '../../Core/Color/Palette.js';
 import Point from '../Series/Point.js';
 const {
     prototype: {
@@ -50,8 +64,6 @@ const {
     defined,
     extend,
     find,
-    format,
-    getOptions,
     isNumber,
     isString,
     merge,
@@ -76,7 +88,7 @@ import '../../Extensions/RangeSelector.js';
  *
  * */
 
-declare module '../Axis/Types' {
+declare module '../Axis/AxisLike' {
     interface AxisLike {
         crossLabel?: SVGElement;
         setCompare(compare?: string, redraw?: boolean): void;
@@ -86,6 +98,12 @@ declare module '../Axis/Types' {
 declare module './ChartLike' {
     interface ChartLike {
         _labelPanes?: Record<string, Axis>;
+    }
+}
+
+declare module '../Options'{
+    interface Options {
+        isStock?: boolean;
     }
 }
 
@@ -119,17 +137,11 @@ declare module '../Renderer/SVG/SVGRendererLike' {
     }
 }
 
-/**
- * Internal types
- * @private
- */
-declare global {
-    namespace Highcharts {
-        interface Options {
-            isStock?: boolean;
-        }
-    }
-}
+/* *
+ *
+ *  Class
+ *
+ * */
 
 /**
  * Stock-optimized chart. Use {@link Highcharts.Chart|Chart} for common charts.
@@ -160,12 +172,12 @@ class StockChart extends Chart {
      * @fires Highcharts.StockChart#event:afterInit
      */
     public init(
-        userOptions: Partial<Highcharts.Options>,
+        userOptions: Partial<Options>,
         callback?: Chart.CallbackFunction
     ): void {
-        // to increase performance, don't merge the data
-        var seriesOptions = userOptions.series,
-            defaultOptions = getOptions(),
+        const defaultOptions = getOptions(),
+            xAxisOptions = userOptions.xAxis,
+            yAxisOptions = userOptions.yAxis,
             // Always disable startOnTick:true on the main axis when the
             // navigator is enabled (#1090)
             navigatorEnabled = pick(
@@ -174,36 +186,10 @@ class StockChart extends Chart {
                 true
             );
 
-        // apply X axis options to both single and multi y axes
-        userOptions.xAxis = splat(userOptions.xAxis || {}).map(function (
-            xAxisOptions: Highcharts.XAxisOptions,
-            i: number
-        ): Highcharts.XAxisOptions {
-            return merge(
-                getDefaultAxisOptions('xAxis', xAxisOptions),
-                defaultOptions.xAxis, // #3802
-                defaultOptions.xAxis && (defaultOptions.xAxis as any)[i], // #7690
-                xAxisOptions, // user options
-                getForcedAxisOptions('xAxis', userOptions)
-            );
-        });
+        // Avoid doing these twice
+        userOptions.xAxis = userOptions.yAxis = void 0;
 
-        // apply Y axis options to both single and multi y axes
-        userOptions.yAxis = splat(userOptions.yAxis || {}).map(function (
-            yAxisOptions: Highcharts.YAxisOptions,
-            i: number
-        ): Highcharts.YAxisOptions {
-            return merge(
-                getDefaultAxisOptions('yAxis', yAxisOptions),
-                defaultOptions.yAxis, // #3802
-                defaultOptions.yAxis && (defaultOptions.yAxis as any)[i], // #7690
-                yAxisOptions // user options
-            );
-        });
-
-        userOptions.series = void 0;
-
-        userOptions = merge(
+        const options = merge(
             {
                 chart: {
                     panning: {
@@ -217,7 +203,7 @@ class StockChart extends Chart {
                 },
                 scrollbar: {
                     // #4988 - check if setOptions was called
-                    enabled: pick((defaultOptions.scrollbar as any).enabled, true)
+                    enabled: pick(defaultOptions.scrollbar && defaultOptions.scrollbar.enabled, true)
                 },
                 rangeSelector: {
                     // #4988 - check if setOptions was called
@@ -246,9 +232,37 @@ class StockChart extends Chart {
             }
         );
 
-        userOptions.series = seriesOptions;
+        userOptions.xAxis = xAxisOptions;
+        userOptions.yAxis = yAxisOptions;
 
-        super.init(userOptions, callback);
+        // apply X axis options to both single and multi y axes
+        options.xAxis = splat(userOptions.xAxis || {}).map(function (
+            xAxisOptions: AxisOptions,
+            i: number
+        ): AxisOptions {
+            return merge(
+                getDefaultAxisOptions('xAxis', xAxisOptions),
+                defaultOptions.xAxis, // #3802
+                defaultOptions.xAxis && (defaultOptions.xAxis as any)[i], // #7690
+                xAxisOptions, // user options
+                getForcedAxisOptions('xAxis', userOptions)
+            );
+        });
+
+        // apply Y axis options to both single and multi y axes
+        options.yAxis = splat(userOptions.yAxis || {}).map(function (
+            yAxisOptions: YAxisOptions,
+            i: number
+        ): YAxisOptions {
+            return merge(
+                getDefaultAxisOptions('yAxis', yAxisOptions),
+                defaultOptions.yAxis, // #3802
+                defaultOptions.yAxis && (defaultOptions.yAxis as any)[i], // #7690
+                yAxisOptions // user options
+            );
+        });
+
+        super.init(options, callback);
     }
 
     /**
@@ -269,7 +283,7 @@ class StockChart extends Chart {
     public createAxis(
         type: string,
         options: Chart.CreateAxisOptionsObject
-    ): Highcharts.Axis {
+    ): Axis {
         options.axis = merge(
             getDefaultAxisOptions(type, options.axis),
             options.axis,
@@ -288,7 +302,7 @@ namespace StockChart {
      * options than the basic Chart.
      *
      * @example
-     * var chart = Highcharts.stockChart('container', {
+     * let chart = Highcharts.stockChart('container', {
      *     series: [{
      *         data: [1, 2, 3, 4, 5, 6, 7, 8, 9],
      *         pointInterval: 24 * 60 * 60 * 1000
@@ -319,8 +333,8 @@ namespace StockChart {
      *         The chart object.
      */
     export function stockChart(
-        a: (string|HTMLDOMElement|Highcharts.Options),
-        b?: (Chart.CallbackFunction|Highcharts.Options),
+        a: (string|HTMLDOMElement|Options),
+        b?: (Chart.CallbackFunction|Options),
         c?: Chart.CallbackFunction
     ): StockChart {
         return new StockChart(a as any, b as any, c);
@@ -338,8 +352,8 @@ namespace StockChart {
  */
 function getDefaultAxisOptions(
     type: string,
-    options: DeepPartial<Highcharts.AxisOptions>
-): DeepPartial<Highcharts.AxisOptions> {
+    options: DeepPartial<AxisOptions>
+): DeepPartial<AxisOptions> {
     if (type === 'xAxis') {
         return {
             minPadding: 0,
@@ -394,8 +408,8 @@ function getDefaultAxisOptions(
  */
 function getForcedAxisOptions(
     type: string,
-    chartOptions: Partial<Highcharts.Options>
-): DeepPartial<Highcharts.AxisOptions> {
+    chartOptions: Partial<Options>
+): DeepPartial<AxisOptions> {
     if (type === 'xAxis') {
         const defaultOptions = getOptions(),
             // Always disable startOnTick:true on the main axis when the
@@ -406,7 +420,7 @@ function getForcedAxisOptions(
                 true
             );
 
-        const axisOptions: DeepPartial<Highcharts.AxisOptions> = {
+        const axisOptions: DeepPartial<AxisOptions> = {
             type: 'datetime',
             categories: void 0
         };
@@ -431,7 +445,7 @@ function getForcedAxisOptions(
 addEvent(Series, 'setOptions', function (
     e: { plotOptions: SeriesTypePlotOptions }
 ): void {
-    var overrides;
+    let overrides;
 
     if (this.chart.options.isStock) {
 
@@ -460,11 +474,8 @@ addEvent(Series, 'setOptions', function (
 
 // Override the automatic label alignment so that the first Y axis' labels
 // are drawn on top of the grid line, and subsequent axes are drawn outside
-addEvent(Axis, 'autoLabelAlign', function (
-    this: Highcharts.Axis,
-    e: Event
-): void {
-    var chart = this.chart,
+addEvent(Axis, 'autoLabelAlign', function (e: Event): void {
+    let chart = this.chart,
         options = this.options,
         panes = chart._labelPanes = chart._labelPanes || {},
         key,
@@ -489,8 +500,8 @@ addEvent(Axis, 'autoLabelAlign', function (
 });
 
 // Clear axis from label panes (#6071)
-addEvent(Axis, 'destroy', function (this: Highcharts.Axis): void {
-    var chart = this.chart,
+addEvent(Axis, 'destroy', function (): void {
+    const chart = this.chart,
         key = this.options && (this.options.top + ',' + this.options.height);
 
     if (key && chart._labelPanes && chart._labelPanes[key] === this) {
@@ -500,10 +511,9 @@ addEvent(Axis, 'destroy', function (this: Highcharts.Axis): void {
 
 // Override getPlotLinePath to allow for multipane charts
 addEvent(Axis, 'getPlotLinePath', function (
-    this: Highcharts.Axis,
-    e: Event & Highcharts.AxisPlotLinePathOptionsObject
+    e: (Event&Axis.PlotLinePathOptions)
 ): void {
-    var axis = this,
+    let axis = this,
         series = (
             this.isLinked && !this.series ?
                 (this.linkedParent as any).series :
@@ -519,8 +529,8 @@ addEvent(Axis, 'getPlotLinePath', function (
         y2,
         result = [] as SVGPath,
         axes = [], // #3416 need a default array
-        axes2: Array<Highcharts.Axis>,
-        uniqueAxes: Array<Highcharts.Axis>,
+        axes2: Array<Axis>,
+        uniqueAxes: Array<Axis>,
         translatedValue = e.translatedValue,
         value = e.value,
         force = e.force,
@@ -531,8 +541,8 @@ addEvent(Axis, 'getPlotLinePath', function (
      * series.
      * @private
      */
-    function getAxis(coll: string): Array<Highcharts.Axis> {
-        var otherColl = coll === 'xAxis' ? 'yAxis' : 'xAxis',
+    function getAxis(coll: string): Array<Axis> {
+        const otherColl = coll === 'xAxis' ? 'yAxis' : 'xAxis',
             opt = (axis.options as any)[otherColl];
 
         // Other axis indexed by number
@@ -542,11 +552,11 @@ addEvent(Axis, 'getPlotLinePath', function (
 
         // Other axis indexed by id (like navigator)
         if (isString(opt)) {
-            return [chart.get(opt) as Highcharts.Axis];
+            return [chart.get(opt) as Axis];
         }
 
         // Auto detect based on existing series
-        return series.map(function (s: Series): Highcharts.Axis {
+        return series.map(function (s: Series): Axis {
             return (s as any)[otherColl];
         });
     }
@@ -565,13 +575,13 @@ addEvent(Axis, 'getPlotLinePath', function (
 
         // Get the related axes based options.*Axis setting #2810
         axes2 = (axis.isXAxis ? chart.yAxis : chart.xAxis);
-        axes2.forEach(function (A: Highcharts.Axis): void {
+        axes2.forEach(function (A): void {
             if (
                 defined(A.options.id) ?
                     A.options.id.indexOf('navigator') === -1 :
                     true
             ) {
-                var a = (A.isXAxis ? 'yAxis' : 'xAxis'),
+                const a = (A.isXAxis ? 'yAxis' : 'xAxis'),
                     rax = (
                         defined((A.options as any)[a]) ?
                             (chart as any)[a][(A.options as any)[a]] :
@@ -591,13 +601,11 @@ addEvent(Axis, 'getPlotLinePath', function (
         uniqueAxes = axes.length ?
             [] :
             [axis.isXAxis ? chart.yAxis[0] : chart.xAxis[0]]; // #3742
-        axes.forEach(function (axis2: Highcharts.Axis): void {
+        axes.forEach(function (axis2): void {
             if (
                 uniqueAxes.indexOf(axis2) === -1 &&
                 // Do not draw on axis which overlap completely. #5424
-                !find(uniqueAxes, function (
-                    unique: Highcharts.Axis
-                ): boolean {
+                !find(uniqueAxes, function (unique: Axis): boolean {
                     return unique.pos === axis2.pos && unique.len === axis2.len;
                 })
             ) {
@@ -611,8 +619,8 @@ addEvent(Axis, 'getPlotLinePath', function (
         );
         if (isNumber(transVal)) {
             if (axis.horiz) {
-                uniqueAxes.forEach(function (axis2: Highcharts.Axis): void {
-                    var skip;
+                uniqueAxes.forEach(function (axis2): void {
+                    let skip;
 
                     y1 = axis2.pos;
                     y2 = (y1 as any) + axis2.len;
@@ -638,8 +646,8 @@ addEvent(Axis, 'getPlotLinePath', function (
                     }
                 });
             } else {
-                uniqueAxes.forEach(function (axis2: Highcharts.Axis): void {
-                    var skip;
+                uniqueAxes.forEach(function (axis2): void {
+                    let skip;
 
                     x1 = axis2.pos;
                     x2 = (x1 as any) + axis2.len;
@@ -683,7 +691,7 @@ addEvent(Axis, 'getPlotLinePath', function (
  * @return {Highcharts.SVGPathArray}
  */
 SVGRenderer.prototype.crispPolyLine = function (
-    this: Highcharts.SVGRenderer,
+    this: SVGRenderer,
     points: Array<SVGPath.MoveTo|SVGPath.LineTo>,
     width: number
 ): SVGPath {
@@ -708,7 +716,7 @@ SVGRenderer.prototype.crispPolyLine = function (
 };
 
 // Wrapper to hide the label
-addEvent(Axis, 'afterHideCrosshair', function (this: Highcharts.Axis): void {
+addEvent(Axis, 'afterHideCrosshair', function (): void {
     if (this.crossLabel) {
         this.crossLabel = this.crossLabel.hide();
     }
@@ -716,7 +724,6 @@ addEvent(Axis, 'afterHideCrosshair', function (this: Highcharts.Axis): void {
 
 // Extend crosshairs to also draw the label
 addEvent(Axis, 'afterDrawCrosshair', function (
-    this: Highcharts.Axis,
     event: { e: PointerEvent; point: Point }
 ): void {
 
@@ -732,7 +739,7 @@ addEvent(Axis, 'afterDrawCrosshair', function (
         return;
     }
 
-    var chart = this.chart,
+    let chart = this.chart,
         log = this.logarithmic,
         options = this.crosshair.label, // the label's options
         horiz = this.horiz, // axis orientation
@@ -775,9 +782,10 @@ addEvent(Axis, 'afterDrawCrosshair', function (
                 options.shape || 'callout'
             )
             .addClass(
-                'highcharts-crosshair-label' + (
-                    this.series[0] &&
-                    ' highcharts-color-' + this.series[0].colorIndex
+                'highcharts-crosshair-label highcharts-color-' + (
+                    point ?
+                        point.series.colorIndex :
+                        this.series[0] && this.series[0].colorIndex
                 )
             )
             .attr({
@@ -794,12 +802,12 @@ addEvent(Axis, 'afterDrawCrosshair', function (
                 .attr({
                     fill: options.backgroundColor ||
                         point && point.series && point.series.color || // #14888
-                        palette.neutralColor60,
+                        Palette.neutralColor60,
                     stroke: options.borderColor || '',
                     'stroke-width': options.borderWidth || 0
                 })
                 .css(extend<CSSObject>({
-                    color: palette.backgroundColor,
+                    color: Palette.backgroundColor,
                     fontWeight: 'normal',
                     fontSize: '11px',
                     textAlign: 'center'
@@ -922,7 +930,7 @@ Series.prototype.init = function (): void {
 };
 
 /**
- * Highstock only. Set the
+ * Highcharts Stock only. Set the
  * [compare](https://api.highcharts.com/highstock/plotOptions.series.compare)
  * mode of the series after render time. In most cases it is more useful running
  * {@link Axis#setCompare} on the X axis to update all its series.
@@ -954,7 +962,7 @@ Series.prototype.initCompare = function (compare?: string): void {
             value?: number,
             point?: Point
         ): (number|undefined) {
-            var compareValue = this.compareValue;
+            const compareValue = this.compareValue;
 
             if (
                 typeof value !== 'undefined' &&
@@ -996,7 +1004,7 @@ Series.prototype.initCompare = function (compare?: string): void {
  * @function Highcharts.Series#processData
  */
 Series.prototype.processData = function (force?: boolean): (boolean|undefined) {
-    var series = this,
+    let series = this,
         i,
         keyIndex = -1,
         processedXData,
@@ -1050,7 +1058,7 @@ addEvent(
     function (e): void {
         const dataExtremes: DataExtremesObject = (e as any).dataExtremes;
         if (this.modifyValue && dataExtremes) {
-            var extremes = [
+            const extremes = [
                 this.modifyValue(dataExtremes.dataMin),
                 this.modifyValue(dataExtremes.dataMax)
             ];
@@ -1062,8 +1070,8 @@ addEvent(
 );
 
 /**
- * Highstock only. Set the compare mode on all series belonging to an Y axis
- * after render time.
+ * Highcharts Stock only. Set the compare mode on all series
+ * belonging to an Y axis after render time.
  *
  * @see [series.plotOptions.compare](https://api.highcharts.com/highstock/series.plotOptions.compare)
  *
@@ -1104,7 +1112,7 @@ Axis.prototype.setCompare = function (
  * @param {string} pointFormat
  */
 Point.prototype.tooltipFormatter = function (pointFormat: string): string {
-    var point = this;
+    const point = this;
     const { numberFormatter } = point.series.chart;
 
     pointFormat = pointFormat.replace(
@@ -1127,7 +1135,7 @@ Point.prototype.tooltipFormatter = function (pointFormat: string): string {
 // related to using multiple panes, and a future pane logic should incorporate
 // this feature (#2754).
 addEvent(Series, 'render', function (): void {
-    var chart = this.chart,
+    let chart = this.chart,
         clipHeight;
 
     // Only do this on not 3d (#2939, #5904) nor polar (#6057) charts, and only
@@ -1145,7 +1153,7 @@ addEvent(Series, 'render', function (): void {
         // Include xAxis line width (#8031) but only if the Y axis ends on the
         // edge of the X axis (#11005).
         if (this.xAxis.axisLine) {
-            var dist = chart.plotTop + chart.plotHeight -
+            const dist = chart.plotTop + chart.plotHeight -
                     (this.yAxis.pos as any) - this.yAxis.len,
                 lineHeightCorrection = Math.floor(
                     this.xAxis.axisLine.strokeWidth() / 2
@@ -1163,21 +1171,39 @@ addEvent(Series, 'render', function (): void {
             this.clipBox = this.clipBox || merge(chart.clipBox);
             this.clipBox.width = this.xAxis.len;
             this.clipBox.height = clipHeight;
+        }
 
-        // On redrawing, resizing etc, update the clip rectangle
-        } else if ((chart as any)[this.sharedClipKey as any]) {
-            // animate in case resize is done during initial animation
-            (chart as any)[this.sharedClipKey as any].animate({
-                width: this.xAxis.len,
-                height: clipHeight
-            });
+        if (chart.hasRendered) {
+            const animation = animObject(this.options.animation);
 
-            // also change markers clip animation for consistency
-            // (marker clip rects should exist only on chart init)
-            if ((chart as any)[this.sharedClipKey + 'm']) {
-                (chart as any)[this.sharedClipKey + 'm'].animate({
-                    width: this.xAxis.len
+            // #15435: this.sharedClipKey might not have been set yet, for
+            // example when updating the series, so we need to use this
+            // function instead
+            const sharedClipKey = this.getSharedClipKey(animation);
+            const clipRect = chart.sharedClips[sharedClipKey];
+
+            // On redrawing, resizing etc, update the clip rectangle.
+            //
+            // #15435: Update it even when we are creating/updating clipBox,
+            // since there could be series updating and pane size changes
+            // happening at the same time and we dont destroy shared clips in
+            // stock.
+            if (clipRect) {
+                // animate in case resize is done during initial animation
+                clipRect.animate({
+                    width: this.xAxis.len,
+                    height: clipHeight
                 });
+
+                const markerClipRect = chart.sharedClips[sharedClipKey + 'm'];
+
+                // also change markers clip animation for consistency
+                // (marker clip rects should exist only on chart init)
+                if (markerClipRect) {
+                    markerClipRect.animate({
+                        width: this.xAxis.len
+                    });
+                }
             }
         }
     }
@@ -1185,9 +1211,9 @@ addEvent(Series, 'render', function (): void {
 
 addEvent(Chart, 'update', function (
     this: StockChart,
-    e: { options: Highcharts.Options }
+    e: { options: Options }
 ): void {
-    var options = e.options;
+    const options = e.options;
 
     // Use case: enabling scrollbar from a disabled state.
     // Scrollbar needs to be initialized from a controller, Navigator in this

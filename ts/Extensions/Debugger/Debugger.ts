@@ -21,15 +21,16 @@ import type SVGElement from '../../Core/Renderer/SVG/SVGElement';
 import Chart from '../../Core/Chart/Chart.js';
 import ErrorMessages from './ErrorMessages.js';
 import H from '../../Core/Globals.js';
-import U from '../../Core/Utilities.js';
 const {
     charts
 } = H;
+import D from '../../Core/DefaultOptions.js';
+const { setOptions } = D;
+import U from '../../Core/Utilities.js';
 const {
     addEvent,
     find,
-    isNumber,
-    setOptions
+    isNumber
 } = U;
 
 /* *
@@ -44,15 +45,18 @@ declare module '../../Core/Chart/ChartLike'{
     }
 }
 
+declare module '../../Core/Chart/ChartOptions'{
+    interface ChartOptions {
+        displayErrors?: boolean;
+    }
+}
+
 /**
  * Internal types
  * @private
  */
 declare global {
     namespace Highcharts {
-        interface ChartOptions {
-            displayErrors?: boolean;
-        }
         let errorMessages: typeof ErrorMessages;
     }
 }
@@ -84,8 +88,8 @@ setOptions({
 
 /* eslint-disable no-invalid-this */
 
-addEvent(Highcharts, 'displayError', function (
-    e: Highcharts.ErrorMessageEventObject
+addEvent(H, 'displayError', function (
+    e: U.ErrorMessageEventObject
 ): void {
     // Display error on the chart causing the error or the last created chart.
     const chart = e.chart ||
@@ -94,7 +98,7 @@ addEvent(Highcharts, 'displayError', function (
         return;
     }
 
-    var code = e.code,
+    let code = e.code,
         msg,
         options = chart.options.chart,
         renderer = chart.renderer,
@@ -170,7 +174,7 @@ addEvent(Highcharts, 'displayError', function (
 });
 
 addEvent(Chart, 'beforeRedraw', function (): void {
-    var errorElements = this.errorElements;
+    const errorElements = this.errorElements;
 
     if (errorElements && errorElements.length) {
         errorElements.forEach(function (el: SVGElement): void {

@@ -1,6 +1,8 @@
+/* eslint-disable */
 import type { CSSJSONObject } from './../../Data/DataCSSObject';
 import type DataJSON from '../../Data/DataJSON';
 import type Component from './../Component/Component.js';
+import type ComponentType from '../Component/ComponentType'
 import DashboardGlobals from './../DashboardGlobals.js';
 import Row from './Row.js';
 import GUIElement from './GUIElement.js';
@@ -11,7 +13,8 @@ import { HTMLDOMElement } from '../../Core/Renderer/DOMElementType';
 
 const {
     merge,
-    isNumber
+    isNumber,
+    fireEvent
 } = U;
 class Cell extends GUIElement {
     /* *
@@ -48,7 +51,7 @@ class Cell extends GUIElement {
         return void 0;
     }
 
-    public static setSize(
+    public static setContainerSize(
         dimensions: { width?: number | string; height?: number | string },
         cellContainer: HTMLDOMElement
     ): void {
@@ -93,9 +96,11 @@ class Cell extends GUIElement {
     ) {
         super();
 
+        this.type = DashboardGlobals.guiElementType.cell;
         this.id = options.id;
         this.options = options;
         this.row = row;
+        this.isVisible = true;
 
         // Get parent container
         const parentContainer =
@@ -136,7 +141,7 @@ class Cell extends GUIElement {
             if (this.options.layout) {
                 const dashboard = this.row.layout.dashboard;
 
-                this.layout = new Layout(
+                this.nestedLayout = new Layout(
                     dashboard,
                     merge(
                         {},
@@ -145,7 +150,8 @@ class Cell extends GUIElement {
                         {
                             parentContainerId: options.id
                         }
-                    )
+                    ),
+                    this
                 );
             }
         } else {
@@ -177,7 +183,12 @@ class Cell extends GUIElement {
     /**
      * Component mounted in the cell.
      */
-    public mountedComponent?: Component;
+    public mountedComponent?: ComponentType;
+
+    /**
+     * Layout nested in the cell.
+     */
+    public nestedLayout?: Layout;
 
     /**
      * Mount component from JSON.
@@ -216,13 +227,21 @@ class Cell extends GUIElement {
      */
     public destroy(): void {
         const cell = this;
+        const { row } = cell;
 
         // Destroy mounted component.
         if (cell.mountedComponent) {
             cell.mountedComponent.destroy();
         }
 
+        row.unmountCell(cell);
+        const destroyRow = row.cells.length === 0;
+
         super.destroy();
+
+        if (destroyRow) {
+            row.destroy();
+        }
     }
 
     /**
@@ -245,10 +264,81 @@ class Cell extends GUIElement {
             }
         };
     }
-}
 
-interface Cell {
-    layout: Layout;
+    public setSize(
+        dimensions: { width?: number | string; height?: number | string }
+    ): void {
+        Cell.setContainerSize(
+            dimensions,
+            this.container as HTMLDOMElement
+        );
+    }
+
+    protected changeVisibility(
+        setVisible: boolean = true
+    ): void {
+        const cell = this,
+            row = cell.row
+
+        super.changeVisibility(setVisible);
+
+        // Change row visibility if needed.
+        if (!cell.row.getVisibleCells().length) {
+            cell.row.hide();
+        } else if (cell.isVisible && !row.isVisible) {
+            cell.row.show();
+        }
+
+        setTimeout(() => {
+            fireEvent(row, 'cellChange', { row, cell })
+        }, 0);
+    }
+
+    public getParentCell(
+        level: number
+    ): Cell | undefined {
+        const cell = this;
+
+        let parentCell;
+
+        if (level <= cell.row.layout.level) {
+            if (cell.row.layout.level === level) {
+                return cell;
+            } else if (cell.row.layout.level - 1 >= 0) {
+                parentCell = cell.row.layout.parentCell;
+
+                if (parentCell) {
+                    return parentCell.getParentCell(level);
+                }
+            }
+        }
+    }
+
+    // Method to get array of overlapping levels.
+    public getOverlappingLevels(
+        align: string, // left, right, top, bottom
+        levelMaxGap: number, // max distance between levels
+        offset?: number // analized cell offset
+    ): Array<number> {
+        const cell = this,
+            parentCell = cell.row.layout.parentCell;
+
+        let levels = [cell.row.layout.level];
+
+        if (parentCell) {
+            const cellOffset = offset || GUIElement.getOffsets(cell)[align];
+            const parentCellOffset = GUIElement.getOffsets(parentCell)[align];
+
+            if (Math.abs(cellOffset - parentCellOffset) < levelMaxGap) {
+                levels = [
+                    ...levels,
+                    ...parentCell.getOverlappingLevels(align, levelMaxGap, parentCellOffset)
+                ];
+            }
+        }
+
+        return levels;
+    }
 }
 
 namespace Cell {

@@ -23,7 +23,9 @@
 import type BBoxObject from '../../Core/Renderer/BBoxObject';
 import type DataLabelOptions from '../../Core/Series/DataLabelOptions';
 import type Funnel3DSeriesOptions from './Funnel3DSeriesOptions';
-import type SVGElement from '../../Core/Renderer/SVG/SVGElement';
+import type SVGLabel from '../../Core/Renderer/SVG/SVGLabel';
+
+import Funnel3DComposition from './Funnel3DComposition.js';
 import Funnel3DPoint from './Funnel3DPoint.js';
 import H from '../../Core/Globals.js';
 const { noop } = H;
@@ -43,7 +45,6 @@ const {
     pick,
     relativeLength
 } = U;
-import './Funnel3DComposition.js';
 
 /* *
  *
@@ -61,6 +62,14 @@ import './Funnel3DComposition.js';
  * @requires modules/funnel3d
  */
 class Funnel3DSeries extends ColumnSeries {
+
+    /* *
+     *
+     *  Static Properties
+     *
+     * */
+
+    public static compose = Funnel3DComposition.compose;
 
     /**
      * A funnel3d is a 3d version of funnel series type. Funnel charts are
@@ -187,10 +196,10 @@ class Funnel3DSeries extends ColumnSeries {
      */
     public alignDataLabel(
         point: Funnel3DPoint,
-        _dataLabel: SVGElement,
+        _dataLabel: SVGLabel,
         options: DataLabelOptions
     ): void {
-        var series = this,
+        const series = this,
             dlBoxRaw = point.dlBoxRaw,
             inverted = series.chart.inverted,
             below = (point.plotY as any) > pick(
@@ -274,7 +283,7 @@ class Funnel3DSeries extends ColumnSeries {
     public translate(): void {
         Series.prototype.translate.apply(this, arguments);
 
-        var sum = 0,
+        let sum = 0,
             series = this,
             chart = series.chart,
             options = series.options,
@@ -309,7 +318,7 @@ class Funnel3DSeries extends ColumnSeries {
 
         // Return the width at a specific y coordinate
         series.getWidthAt = getWidthAt = function (y: number): number {
-            var top = (centerY - height / 2);
+            const top = (centerY - height / 2);
 
             return (y > neckY || height === neckHeight) ?
                 neckWidth :

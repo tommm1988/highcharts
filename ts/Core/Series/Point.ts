@@ -32,13 +32,18 @@ import type { SeriesZonesOptions } from './SeriesOptions';
 import type { StatesOptionsKey } from './StatesOptions';
 import type SVGAttributes from '../Renderer/SVG/SVGAttributes';
 import type SVGElement from '../Renderer/SVG/SVGElement';
+import type SVGLabel from '../Renderer/SVG/SVGLabel';
 import type SVGPath from '../Renderer/SVG/SVGPath';
+import type { SymbolKey } from '../Renderer/SVG/SymbolType';
+
 import AST from '../Renderer/HTML/AST.js';
 import A from '../Animation/AnimationUtilities.js';
 const { animObject } = A;
+import F from '../FormatUtilities.js';
+const { format } = F;
 import H from '../Globals.js';
-import O from '../Options.js';
-const { defaultOptions } = O;
+import D from '../DefaultOptions.js';
+const { defaultOptions } = D;
 import U from '../Utilities.js';
 const {
     addEvent,
@@ -46,7 +51,6 @@ const {
     erase,
     extend,
     fireEvent,
-    format,
     getNestedProperty,
     isArray,
     isFunction,
@@ -440,7 +444,7 @@ class Point {
      */
     public colorIndex?: number = void 0;
 
-    public dataLabels?: Array<SVGElement>;
+    public dataLabels?: Array<SVGLabel>;
 
     public formatPrefix: string = 'point';
 
@@ -532,8 +536,6 @@ class Point {
      */
     public total?: number = void 0;
 
-    public touched?: boolean;
-
     /**
      * For certain series types, like pie charts, where individual points can
      * be shown or hidden.
@@ -561,7 +563,7 @@ class Point {
      * @function Highcharts.Point#animateBeforeDestroy
      */
     public animateBeforeDestroy(): void {
-        var point = this,
+        let point = this,
             animateParams = { x: point.startXPos, opacity: 0 },
             isDataLabel,
             graphicalProps = point.getGraphicalProps();
@@ -613,7 +615,7 @@ class Point {
         options: (PointOptions|PointShortOptions),
         x?: number
     ): Point {
-        var point = this,
+        const point = this,
             series = point.series,
             pointValKey = series.options.pointValKey || series.pointValKey;
 
@@ -690,7 +692,7 @@ class Point {
      * @function Highcharts.Point#destroy
      */
     public destroy(): void {
-        var point = this,
+        let point = this,
             series = point.series,
             chart = series.chart,
             dataSorting = series.options.dataSorting,
@@ -751,7 +753,7 @@ class Point {
      * @param {Highcharts.Dictionary<number>} [kinds]
      */
     public destroyElements(kinds?: Record<string, number>): void {
-        var point = this,
+        const point = this,
             props = point.getGraphicalProps(kinds);
 
         props.singular.forEach(function (prop: string): void {
@@ -793,7 +795,7 @@ class Point {
             EventCallback<Point, T>|Function
         )
     ): void {
-        var point = this,
+        const point = this,
             series = this.series,
             seriesOptions = series.options;
 
@@ -856,7 +858,7 @@ class Point {
      * @return {Highcharts.PointGraphicalProps}
      */
     public getGraphicalProps(kinds?: Record<string, number>): Highcharts.PointGraphicalProps {
-        var point = this,
+        let point = this,
             props = [],
             prop,
             i,
@@ -881,7 +883,7 @@ class Point {
         }
 
         ['dataLabel', 'connector'].forEach(function (prop: string): void {
-            var plural = prop + 's';
+            const plural = prop + 's';
             if ((kinds as any)[prop] && (point as any)[plural]) {
                 graphicalProps.plural.push(plural);
             }
@@ -936,7 +938,7 @@ class Point {
      *         The zone item.
      */
     public getZone(): SeriesZonesOptions {
-        var series = this.series,
+        let series = this.series,
             zones = series.zones,
             zoneAxis = series.zoneAxis || 'y',
             i = 0,
@@ -1049,7 +1051,7 @@ class Point {
      * @return {void}
      */
     public resolveColor(): void {
-        var series = this.series,
+        let series = this.series,
             colors,
             optionsChart = series.chart.options.chart,
             colorCount = optionsChart.colorCount,
@@ -1114,7 +1116,7 @@ class Point {
         value: any,
         key: string
     ): T {
-        var nestedKeys = key.split('.');
+        const nestedKeys = key.split('.');
 
         nestedKeys.reduce(function (
             result: any,
@@ -1122,7 +1124,7 @@ class Point {
             i: number,
             arr: Array<string>
         ): T {
-            var isLastKey = arr.length - 1 === i;
+            const isLastKey = arr.length - 1 === i;
 
             result[key] = (
                 isLastKey ?
@@ -1150,7 +1152,7 @@ class Point {
     public tooltipFormatter(pointFormat: string): string {
 
         // Insert options for valueDecimals, valuePrefix, and valueSuffix
-        var series = this.series,
+        const series = this.series,
             seriesTooltipOptions = series.tooltipOptions,
             valueDecimals = pick(seriesTooltipOptions.valueDecimals, ''),
             valuePrefix = seriesTooltipOptions.valuePrefix || '',
@@ -1222,7 +1224,7 @@ class Point {
         animation?: (boolean|Partial<AnimationOptions>),
         runEvent?: boolean
     ): void {
-        var point = this,
+        let point = this,
             series = point.series,
             graphic = point.graphic,
             i: number,
@@ -1369,7 +1371,7 @@ class Point {
         selected?: boolean,
         accumulate?: boolean
     ): void {
-        var point = this,
+        const point = this,
             series = point.series,
             chart = series.chart;
 
@@ -1403,7 +1405,7 @@ class Point {
                     chart.getSelectedPoints().forEach(function (
                         loopPoint: Point
                     ): void {
-                        var loopSeries = loopPoint.series;
+                        const loopSeries = loopPoint.series;
 
                         if (loopPoint.selected && loopPoint !== point) {
                             loopPoint.selected = loopPoint.options.selected =
@@ -1440,7 +1442,7 @@ class Point {
      *        The event arguments.
      */
     public onMouseOver(e?: PointerEvent): void {
-        var point = this,
+        const point = this,
             series = point.series,
             chart = series.chart,
             pointer = chart.pointer;
@@ -1460,7 +1462,7 @@ class Point {
      * @fires Highcharts.Point#event:mouseOut
      */
     public onMouseOut(): void {
-        var point = this,
+        const point = this,
             chart = point.series.chart;
 
         point.firePointEvent('mouseOut');
@@ -1485,7 +1487,7 @@ class Point {
      */
     public importEvents(): void {
         if (!this.hasImportedEvents) {
-            var point = this,
+            const point = this,
                 options = merge(
                     point.series.options.point as PointOptions,
                     point.options
@@ -1525,7 +1527,7 @@ class Point {
         state?: (StatesOptionsKey|''),
         move?: boolean
     ): void {
-        var point = this,
+        let point = this,
             series = point.series,
             previousState = point.state,
             stateOptions = (
@@ -1552,7 +1554,7 @@ class Point {
             pointAttribs: SVGAttributes,
             pointAttribsAnimation: AnimationOptions,
             hasMarkers = (markerOptions && series.markerAttribs),
-            newSymbol;
+            newSymbol: (SymbolKey|undefined);
 
         state = state || ''; // empty string
 
@@ -1761,7 +1763,7 @@ class Point {
             );
         }
 
-        fireEvent(point, 'afterSetState');
+        fireEvent(point, 'afterSetState', { state });
     }
 
     /**
@@ -1777,7 +1779,7 @@ class Point {
      *         The path definition.
      */
     public haloPath(size: number): SVGPath {
-        var series = this.series,
+        const series = this.series,
             chart = series.chart;
 
         return chart.renderer.symbols.circle(

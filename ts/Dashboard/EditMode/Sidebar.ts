@@ -8,12 +8,14 @@ import Menu from './Menu/Menu.js';
 import type MenuItem from './Menu/MenuItem.js';
 import DashboardGlobals from '../DashboardGlobals.js';
 import { HTMLDOMElement } from '../../Core/Renderer/DOMElementType.js';
-import WindbarbPoint from '../../Series/Windbarb/WindbarbPoint.js';
+import EditRenderer, { FormField } from './EditRenderer.js';
+import Bindings from '../Actions/Bindings.js';
 
 const {
     merge,
     createElement,
-    addEvent
+    addEvent,
+    uniqueKey
 } = U;
 
 class Sidebar {
@@ -25,39 +27,226 @@ class Sidebar {
     protected static readonly defaultOptions: Sidebar.Options = {
         enabled: true,
         className: 'test',
-        menu: {
-            items: ['t1', 't2']
-        }
+        dragIcon: EditGlobals.iconsURL + '/drag.svg',
+        closeIcon: EditGlobals.iconsURL + '/close.svg'
     }
 
     public static tabs: Array<Sidebar.TabOptions> = [{
         type: 'design',
         icon: '',
-        items: ['t1']
+        items: {
+            cell: ['cellWidth']
+        }
     }, {
         type: 'data',
         icon: '',
-        items: ['t2']
+        items: {
+            cell: ['']
+        }
     }, {
         type: 'component',
         icon: '',
-        items: ['t1', 't2']
+        items: {
+            cell: ['componentSettings']
+        }
+    }]
+
+    public static components: Array<Sidebar.AddComponentDetails> = [
+        {
+            text: 'layout',
+            onDrop: function (): void {}
+        }, {
+            text: 'chart',
+            onDrop: function (sidebar: Sidebar, dropContext: Cell|Row): void {
+                if (sidebar && dropContext) {
+                    sidebar.onDropNewComponent(dropContext, {
+                        type: 'chart',
+                        cell: '',
+                        chartOptions: {
+                            type: 'line',
+                            series: [{
+                                name: 'Series from options',
+                                data: [1, 2, 3, 4]
+                            }],
+                            chart: {
+                                animation: false,
+                                width: 400
+                            }
+                        }
+                    });
+                }
+            }
+        }, {
+            text: 'HTML',
+            onDrop: function (sidebar: Sidebar, dropContext: Cell|Row): void {
+                if (sidebar && dropContext) {
+                    sidebar.onDropNewComponent(dropContext, {
+                        cell: '',
+                        type: 'html',
+                        dimensions: {
+                            width: 200,
+                            height: 200
+                        },
+                        elements: [{
+                            tagName: 'img',
+                            attributes: {
+                                src: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAOEAAADhCAMAAAAJbSJIAAABIFBMVEX//' +
+                                '/93dY2j7Llkmp+AhegwQ2uf67ZblZqBhOtlnKBjm5yAheql8Lt2c4wtPmh1b4t6f+d3dIhxb4h5fufw9Pj3/' +
+                                'fllmaF8iN53jNBYk5rz9P1nmKbP3OR5i9Vtk7jY9+G38Mitxc/O9dru+/Kr7r/F89Lk+et/g988Unc1SHBAW' +
+                                'XuYur5woqfS4eLZ3vO3y9fW1/jl7PGanu1+qLFwkb+rru+/wfObucSLj+puk7hzj8fv7/xqlbCjp+61uPHH1' +
+                                '9/IyvWGrLfn6PuGmqZ6ebig4biOraZ+gdJ6e6+Uvqx/hpab0LJ8f8Z5eaNmeqJejZpeYoFOcIpZgZRUeJNRW' +
+                                'n2vysyd17WJoaGCjpqgnrS1tceFr7ONjKXOztuVwq6wsMM1MXwqAAAGOElEQVR4nO2aeVcURxTF6WWmG2djF' +
+                                'yEJIw4oigZxCVFURInGJSiuaEy+/7dIVVd1d1V19TLhzOlHn/v7f87pe97td+9rmJoCAAAAAAAAAAAAAAAA' +
+                                'AAAAAAAAAAAAAAAAAAAAAAAAVLhV9wNMnIu/1v0EE2ZnfvV23c8wWXbD/Tt1P8NEOZwJ7waX636KSXJvJly+' +
+                                'cKnBPl0JO52LF7w7C3U/yMS4P+P7/pIX/Fb3g0yMvY7vh6ued+mnup9kQuzMsxGGv1/wvKWG+nS3wxU+YAqD' +
+                                'p3U/y0Q45CP0Oz8zhd6lJ3U/zSR4NBMpvDjNFHpLDYyMhx1uUsYqVxg0sNpEUcFfxP1oiEHzKrgvRxje5S8' +
+                                'ik9g0nx7M+1LhslDoNc2nu3KEPu9tYojNqja35FvIJUqFXtCoavOokygMV6XCRlWbh+kI/fCXZIgN8uljVeG' +
+                                'DWKEXNKbaLPipSWVva5hPD5QRsmWaCGxOBd9TRhj3NimRXrXZWFsc+zc785pA2dukT8lVm7W2O1y7Mt5vHuk' +
+                                'jjHsb0Wqz6Lrtdnu4PobIwxlfV7isKqT3dXHYdscU+dhQmPQ2Abmvi5tcoRA5qiRyxddN6vtXl1SF3tLEn3k' +
+                                '8Ft0UJnJjs+wHB/OGQKW30aw2G213LJF75giV3iZ9SqyCb2oKI5HuxmZuhuzMmALV3kaz2ozcDAUid8OMQrW' +
+                                '3kfTphjnEWOTQ0gbMqIgUXvUMiH1dzNi0SOQ9i0Ktt5H0qcWmqci2VnlWOpk94xu9TUCrgq/nDTGZZBKU960' +
+                                'j1HubeBVJVfArhQpdtQ1koyJSuJxRSKzaDMskRipH65s781aFRm8TkKrgaxUUcpHdZ89f+LY3sZMVSCsyrlQ' +
+                                'S6LpHg9nZwfMXnY6pMswsU49YtaliU9ft/jFwHGd2tvfSnGT0d9IMlCKjmk1HjoRNkokMU5WZ3kbOp4vl8tg' +
+                                'I/xw4TirSefniamxX66qhVW2q2LT7queoMLu+feNHItXvbUR9mtvcFIGvB06G2dm3b6JJ2lYNra+LFUb4xaK' +
+                                'Qi3SYyHDfalNK1cZ+YKgCjwY9q0Ixyb+OlzLdNPIpmWpTalMRFbm86197f+xZRNKpNgUHRsSolztCzqDf6ve' +
+                                '33rNJGirpfF0sPjD0qLDQa3H6bJInTKSqkswf+MsOjFeFI3ScrVZLitwyRJLxaaFNrVGh8bGVwEReV0SSqTa' +
+                                'FNu1+LRmh866l0u+3UpFU/sBfZFMWFSUCDYWxyONIJJVqU9DcSqKCMzAVSpEfmEgqPi04MI6cMpOmqyajkok' +
+                                'k8gf+/AOjLCoirtkVigz5QMOn+TatMEJ1mWameHKjbm2CvOZWHhWczKqR+ljRmZ6mMcLcA6M8KjhzOeNjmRF' +
+                                '8qltZjP3A6H6uMkLZ23R9fHwsELfrFpZgt2neYWiyZci79kEeVMHNuoWlWJvbUfFVkfBR03f9xItr2/e6ZSn' +
+                                'YmluFtBekq0ZsF3LHBcfa3MquiphBYs8T9UoMiCSFJGvT7j8VRyiWab/1/li/Dz0qSSHI2rRaVHB6W/w2ND/' +
+                                'X0EkKQcamFaNCKLx+Mm1+xCCUFBKzuXW/VBthb25w+jQjj1ZSCMwDo1pU9OacbytTN4PspzZKSSFY1BVWioq' +
+                                '5ub9/8HViUUgqKSSGTauM71TKWMgKpJUUAs2mpVHBxvctTYPtjERaSSHQ7+DiqJjrnf5Qf3vDsCm1pJAoB0b' +
+                                'hYcjs+a/xln0yFJJLCoFyYBREBd8umZ8aq4ZeUkiUqMgZIQ8/25K8rSuklxSSxKY5UaFvFw0t8Wn9z5BKYtO' +
+                                'RXd9p1p4x36knhUQeGJZviJbtoqGuGjJfnyzEB4Z5GMbdJZ8nqUKiSSEQB4YRFT0WfqUvlrJqiCaFJLJp91l' +
+                                'Ps2fedlFZSD9dUE0KAW9u3c/pVWENPytxbwvIJoWAHxhJVJRtF424t1G8KTTYgTGqul005DKlnBSCtXYUFXy' +
+                                '7jPf3W9nbKCeFYJFHRcXtorEQkE8KyfD1oKi75LNNPykEm1+rbxeN7/STQvJ/XyS2auivmTPBehv5pDgbN4P' +
+                                'zsGbOwsI5SIozsk3jH0smSMM9CgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADg3PAfRD' +
+                                'WjQM3VeT0AAAAASUVORK5CYII='
+                            }
+                        }]
+                    });
+                }
+            }
+        }, {
+            text: 'table',
+            onDrop: function (): void {}
+        }
+    ];
+
+    public static tabsGeneralOptions: Array<Sidebar.TabOptions> = [{
+        type: 'components',
+        icon: '',
+        items: {
+            cell: ['addComponent']
+        }
+    }, {
+        type: 'layout',
+        icon: '',
+        items: {
+            cell: ['addLayout']
+        }
     }]
 
     public static items: Record<string, MenuItem.Options> =
     merge(Menu.items, {
-        t1: {
-            type: 't1',
-            text: 'tool1',
+        componentSettings: {
+            id: 'componentSettings',
+            type: 'componentSettings',
+            text: 'Settings',
             events: {
-                click: function (): void {}
+                update: function (): void {
+                    ((this as MenuItem).menu.parent as Sidebar).getComponentEditableOptions();
+                }
             }
         },
-        t2: {
-            type: 't2',
-            text: 'tool2',
+        cellWidth: {
+            id: 'cellWidth',
+            type: 'input',
+            text: 'Cell width',
             events: {
-                click: function (): void {}
+                click: function (this: MenuItem, input: HTMLDOMElement, e: any): void {
+                    const inputValue = +(input as any).value,
+                        cell = this.menu.parent.context;
+
+                    if (cell.getType() === DashboardGlobals.guiElementType.cell) {
+                        cell.setSize({ width: inputValue });
+                    }
+                },
+                update: function (this: MenuItem, e: any): void {
+                    const item = this,
+                        cell = this.menu.parent.context;
+
+                    if (cell &&
+                        cell.getType() === DashboardGlobals.guiElementType.cell &&
+                        cell.container &&
+                        item.innerElement &&
+                        item.innerElement.tagName === 'INPUT' &&
+                        (item.innerElement as any).value !== cell.container.offsetWidth
+                    ) {
+                        (item.innerElement as any).value = cell.container.offsetWidth;
+                    }
+                },
+                onCellResize: function (this: MenuItem, e: any): void {
+                    if (this.options.events && this.options.events.update) {
+                        this.options.events.update.apply(this, arguments);
+                    }
+                }
+            }
+        },
+        rowHeight: {
+            id: 'rowHeight',
+            type: 'input',
+            text: 'Row height',
+            events: {
+                click: function (this: MenuItem, input: HTMLDOMElement, e: any): void {
+                    const inputValue = +(input as any).value,
+                        row = this.menu.parent.context;
+
+                    if (row.getType() === DashboardGlobals.guiElementType.row) {
+                        row.setSize(inputValue);
+                    }
+                },
+                update: function (this: MenuItem, e: any): void {
+                    const item = this,
+                        row = this.menu.parent.context;
+
+                    if (
+                        row.getType() === DashboardGlobals.guiElementType.row &&
+                        row.container &&
+                        item.innerElement &&
+                        item.innerElement.tagName === 'INPUT' &&
+                        (item.innerElement as any).value !== row.container.offsetHeight
+                    ) {
+                        (item.innerElement as any).value = row.container.offsetHeight;
+                    }
+                },
+                onCellResize: function (this: MenuItem, e: any): void {
+                    if (this.options.events && this.options.events.update) {
+                        this.options.events.update.apply(this, arguments);
+                    }
+                }
+            }
+        }
+    })
+
+    public static itemsGeneralOptions: Record<string, MenuItem.Options> =
+    merge({}, {
+        addLayout: {
+            id: 'addLayout',
+            type: 'addLayout',
+            events: {
+                update: function (): void {
+                    ((this as MenuItem).menu.parent as Sidebar).getLayoutOptions();
+                }
+            }
+        },
+        addComponent: {
+            id: 'addComponent',
+            type: 'addComponent',
+            events: {
+                update: function (): void {
+                    ((this as MenuItem).menu.parent as Sidebar).getComponents();
+                }
             }
         }
     })
@@ -72,23 +261,26 @@ class Sidebar {
     ) {
         this.tabs = {};
         this.isVisible = false;
-        this.options = (editMode.options.toolbars || {}).settings;
+        this.isDragged = false;
+        this.options = merge(
+            Sidebar.defaultOptions,
+            (editMode.options.toolbars || {}).settings
+        );
         this.editMode = editMode;
 
         this.container = this.renderContainer();
 
+        this.renderCloseButton();
+        this.renderDragDropButton();
         this.renderTitle();
-        this.initTabs();
-
-        this.menu = new Menu(
-            this.container,
-            merge(
-                Sidebar.defaultOptions.menu,
-                (this.options || {}).menu
-            )
+        this.initTabs(
+            Sidebar.tabs,
+            true
         );
-
-        this.menu.initItems(Sidebar.items);
+        this.initTabs(
+            Sidebar.tabsGeneralOptions
+        );
+        this.initEvents();
     }
 
     /* *
@@ -104,7 +296,10 @@ class Sidebar {
     public title?: HTMLDOMElement;
     public tabs: Record<string, Sidebar.Tab>;
     public activeTab?: Sidebar.Tab;
-    public menu: Menu;
+    public context?: Cell|Row;
+    public isDragged: boolean;
+    public rowCellTab?: HTMLDOMElement;
+    public generalOptionsTab?: HTMLDOMElement;
 
     /* *
     *
@@ -127,49 +322,52 @@ class Sidebar {
 
     private renderTitle(): void {
         const sidebar = this;
+        const sidebarContainer = this.container;
 
-        const titleElement = sidebar.title = createElement(
+        sidebar.title = createElement(
             'div', {
                 className: EditGlobals.classNames.editSidebarTitle,
                 textContent: 'Cell Options' // shoudl be dynamic
             }, {}, sidebar.container
         );
-
-        // set default offset top, when cell or row is lower
-        const offsetTop = titleElement.getBoundingClientRect().top;
-
-        if (window.pageYOffset > offsetTop) {
-            titleElement.style.marginTop = window.pageYOffset - offsetTop + 'px';
-        } else {
-            titleElement.style.marginTop = '0px';
-        }
-
-        // add sticky position
-        addEvent(window, 'scroll', function (): void {
-            const containerOffsetTop = window.pageYOffset - offsetTop;
-
-            if (window.pageYOffset >= offsetTop) {
-                titleElement.style.marginTop = containerOffsetTop + 'px';
-            } else {
-                titleElement.style.marginTop = '0px';
-            }
-        });
     }
 
-    private initTabs(): void {
-        const sidebar = this,
-            tabs = Sidebar.tabs;
+    private initTabs(
+        tabs: Array<Sidebar.TabOptions>,
+        isRowCell?: boolean
+    ): void {
+        const sidebar = this;
 
-        const container = createElement(
+        // create the whole tab (including menu) container
+        const tabContainer = createElement(
             'div', {
-                className: EditGlobals.classNames.editSidebarTabsContainer
+                className: EditGlobals.classNames.editSidebarTabContainer
             }, {}, sidebar.container
         );
 
+        if (isRowCell) {
+            sidebar.rowCellTab = tabContainer;
+        } else {
+            sidebar.generalOptionsTab = tabContainer;
+        }
+
+        // create tab menu container
+        const container = createElement(
+            'div', {
+                className: EditGlobals.classNames.editSidebarTabsContainer
+            }, {}, tabContainer
+        );
 
         let tabElement;
+        let contentContainer;
+        let content;
+        let saveBtn;
+        let contentItems = [];
 
         for (let i = 0, iEnd = tabs.length; i < iEnd; ++i) {
+            contentItems = tabs[i].items.cell;
+            const isComponentSettings = contentItems[0] === 'componentSettings';
+
             tabElement = createElement(
                 'div', {
                     className: EditGlobals.classNames.editSidebarTab,
@@ -180,12 +378,81 @@ class Sidebar {
                 }, {}, container
             );
 
+            contentContainer = createElement(
+                'div', {
+                    className: EditGlobals.classNames.editSidebarTabContent
+                }, {}, tabContainer
+            );
+
+            content = new Menu(
+                contentContainer,
+                {
+                    itemsClassName: EditGlobals.classNames.editSidebarMenuItem,
+                    items: contentItems
+                },
+                sidebar
+            );
+
+            content.initItems(
+                isRowCell ? Sidebar.items : Sidebar.itemsGeneralOptions,
+                true
+            );
+
+            if (isRowCell) {
+                saveBtn = EditRenderer.renderButton(
+                    contentContainer,
+                    {
+                        value: 'Save',
+                        className: EditGlobals.classNames.editSidebarTabBtn,
+                        callback: (): void => {
+                            // temp switch
+                            if (isComponentSettings) {
+                                sidebar.updateComponent();
+                            }
+                        }
+                    }
+                );
+            }
+
             sidebar.tabs[tabs[i].type] = {
                 element: tabElement,
                 options: tabs[i],
-                isActive: false
+                isActive: false,
+                contentContainer: contentContainer,
+                content: content,
+                saveBtn: saveBtn as HTMLDOMElement
             };
         }
+    }
+
+    private initEvents(): void {
+        const sidebar = this;
+
+        // Hide row and cell toolbars when mouse on sidebar.
+        addEvent(sidebar.container, 'mouseenter', (event): void => {
+            if (sidebar.isVisible) {
+                sidebar.editMode.hideToolbars(['row', 'cell']);
+            }
+        });
+
+        // Call onCellResize events in active sidebar items.
+        addEvent(sidebar.editMode.dashboard, 'cellResize', function (): void {
+            let item;
+
+            if (sidebar.activeTab) {
+                for (let i = 0, iEnd = sidebar.activeTab.content.activeItems.length; i < iEnd; ++i) {
+                    item = sidebar.activeTab.content.activeItems[i];
+
+                    if (item.options.events && item.options.events.onCellResize) {
+                        item.options.events.onCellResize.apply(item, arguments);
+                    }
+                }
+            }
+        });
+
+        // Add sidebar drag drop events.
+        addEvent(document, 'mousemove', sidebar.onDrag.bind(sidebar));
+        addEvent(document, 'mouseup', sidebar.onDragEnd.bind(sidebar));
     }
 
     public updateTitle(
@@ -208,92 +475,379 @@ class Sidebar {
             sidebar.activeTab.element.classList.remove(
                 EditGlobals.classNames.editSidebarTabActive
             );
+            sidebar.activeTab.contentContainer.style.display = 'none';
         }
 
         tab.element.classList.add(
             EditGlobals.classNames.editSidebarTabActive
         );
 
+        tab.contentContainer.style.display = 'block';
+
         sidebar.activeTab = tab;
         tab.isActive = true;
 
-        sidebar.menu.updateActiveItems(tab.options.items);
+        tab.content.updateActiveItems();
     }
 
-    public show(): void {
-        if (this.container) {
-            // activate first tab.
-            this.onTabClick(this.tabs[Sidebar.tabs[0].type]);
+    public show(
+        context?: Cell|Row
+    ): void {
+        const sidebar = this;
 
-            if (!this.isVisible) {
-                this.container.classList.add(
-                    EditGlobals.classNames.editSidebarShow
-                );
-                this.isVisible = true;
+        // hide tabs
+        if (sidebar.rowCellTab) {
+            sidebar.rowCellTab.classList.remove('current');
+        }
 
-                // set margin on all layouts in dashboard to avoid overlap
-                this.reserveToolbarSpace();
+        if (sidebar.generalOptionsTab) {
+            sidebar.generalOptionsTab.classList.remove('current');
+        }
 
-                // Hide row and cell toolbars.
-                this.editMode.hideToolbars(['cell', 'row']);
+        // run current tab
+        this.update(context);
+
+        if (context) {
+            if (sidebar.rowCellTab) {
+                sidebar.rowCellTab.classList.add('current');
+            }
+        } else {
+            if (sidebar.generalOptionsTab) {
+                sidebar.generalOptionsTab.classList.add('current');
+            }
+        }
+
+        if (!this.isVisible) {
+            this.container.style.left = '0px';
+            this.container.style.top = '0px';
+            this.container.classList.add(
+                EditGlobals.classNames.editSidebarShow
+            );
+            this.isVisible = true;
+
+            // Hide row and cell toolbars.
+            this.editMode.hideToolbars(['cell', 'row']);
+        }
+    }
+
+    public update(
+        context: Cell|Row|undefined
+    ): void {
+        const sidebarContainer = this.container;
+
+        this.context = context;
+        // activate first tab.
+        this.onTabClick(this.tabs[
+            context ? Sidebar.tabs[0].type : Sidebar.tabsGeneralOptions[0].type
+        ]);
+
+        // set the position
+        sidebarContainer.style.marginTop = '0px';
+        const offsetTop = sidebarContainer.getBoundingClientRect().top;
+
+        sidebarContainer.style.marginTop = (
+            offsetTop < 0 ? Math.abs(offsetTop) : 0
+        ) + 'px';
+
+        // reset drag X, Y dimension
+        sidebarContainer.style.top = '0px';
+        sidebarContainer.style.left = '0px';
+    }
+
+    public hide(): void {
+        this.context = void 0;
+
+        this.container.classList.remove(
+            EditGlobals.classNames.editSidebarShow
+        );
+
+        if (this.editMode.cellToolbar) {
+            this.editMode.cellToolbar.resetEditedCell();
+        }
+
+        if (this.editMode.rowToolbar) {
+            this.editMode.rowToolbar.resetEditedRow();
+        }
+
+        this.isVisible = false;
+        this.guiElement = void 0;
+    }
+
+
+    public renderCloseButton(): void {
+        const sidebar = this;
+        const closeIcon = sidebar.options && sidebar.options.closeIcon;
+
+        sidebar.closeButton = EditRenderer.renderButton(
+            sidebar.container,
+            {
+                className: EditGlobals.classNames.sidebarNavButton,
+                callback: (): void => {
+                    sidebar.hide();
+                },
+                icon: closeIcon
+            }
+        );
+    }
+
+    public renderDragDropButton(): void {
+        const sidebar = this;
+        const dragIcon = sidebar.options && sidebar.options.dragIcon;
+
+        sidebar.dragDropButton = EditRenderer.renderButton(
+            sidebar.container,
+            {
+                className: EditGlobals.classNames.sidebarNavButton,
+                style: {
+                    cursor: 'grab'
+                },
+                icon: dragIcon
+            }
+        ) as HTMLDOMElement;
+
+        sidebar.dragDropButton.onmousedown = sidebar.onDragStart.bind(sidebar);
+        sidebar.dragDropButton.onmouseup = sidebar.onDragEnd.bind(sidebar);
+    }
+
+    public onDragStart(): void {
+        this.isDragged = true;
+
+        if (this.dragDropButton) {
+            this.dragDropButton.style.cursor = 'grabbing';
+        }
+    }
+
+    public onDrag(e: any): void {
+        if (this.isDragged) {
+            const cntStyle = this.container.style;
+
+            this.container.style.left = +cntStyle.left.slice(0, -2) +
+                e.movementX + 'px';
+            this.container.style.top = +cntStyle.top.slice(0, -2) +
+                e.movementY + 'px';
+        }
+    }
+
+    public onDragEnd(): void {
+        if (this.isDragged) {
+            this.isDragged = false;
+
+            if (this.dragDropButton) {
+                this.dragDropButton.style.cursor = 'grab';
             }
         }
     }
 
-    public hide(): void {
-        if (this.container) {
-            this.container.classList.remove(
-                EditGlobals.classNames.editSidebarShow
+    // Currently for the future, remove when not use.
+    public afterCSSAnimate(
+        element: HTMLDOMElement,
+        callback: Function
+    ): void {
+        addEvent(element, 'transitionend', callback);
+        addEvent(element, 'oTransitionEnd', callback);
+        addEvent(element, 'webkitTransitionEnd', callback);
+    }
+
+    public getComponentEditableOptions(): void {
+        const sidebar = this;
+        const lang = this.editMode.lang;
+        const cell = (sidebar.context as Cell);
+        const currentComponent = cell && cell.mountedComponent;
+        const componentSettings = currentComponent &&
+            currentComponent.editableOptions.getEditableOptions();
+
+        if (
+            sidebar.componentEditableOptions &&
+            cell.id === sidebar.componentEditableOptions.currentElementId
+        ) {
+            return;
+        }
+
+        if (componentSettings) {
+            const menuItems = {};
+            const items: Array<string> = [];
+            const activeTab = sidebar.activeTab && sidebar.activeTab;
+            const activeTabContainer = activeTab && activeTab.content &&
+                activeTab && activeTab.content.container;
+            let type;
+
+            for (const key in componentSettings) {
+                if (componentSettings[key]) {
+                    type = componentSettings[key].type;
+
+                    (menuItems as any)[key] = {
+                        id: key,
+                        type: type === 'text' ? 'input' : type,
+                        text: (lang as any)[key] || key,
+                        isActive: true,
+                        value: componentSettings[key].value
+                    };
+
+                    items.push(
+                        key
+                    );
+                }
+            }
+
+            // remove previous options
+            if (sidebar.componentEditableOptions) {
+                sidebar.componentEditableOptions.destroy();
+            }
+
+            sidebar.componentEditableOptions = new Menu(
+                activeTabContainer as HTMLDOMElement,
+                {
+                    itemsClassName: EditGlobals.classNames.editSidebarMenuItem,
+                    items: items
+                },
+                sidebar
             );
 
-            this.isVisible = false;
-            this.removeToolbarSpace();
-            this.guiElement = void 0;
+            sidebar.componentEditableOptions.initItems(
+                menuItems,
+                true
+            );
+
+            sidebar.componentEditableOptions.currentElementId = cell.id;
         }
     }
 
-    private reserveToolbarSpace(): void {
-        const layouts = this.editMode.dashboard.container.querySelectorAll(
-            '.' + DashboardGlobals.classNames.layout
-        );
+    public getComponents(): void {
+        const sidebar = this;
+        const activeTab = this.activeTab;
+        const tabContainer = activeTab && activeTab.contentContainer;
+        const components = Sidebar.components;
 
-        for (let i = 0, iEnd = layouts.length; i < iEnd; ++i) {
-            layouts[i].classList.add(
-                EditGlobals.classNames.layoutToolbarSpace
+        let gridElement;
+
+        if (activeTab && activeTab.listComponent) {
+            return;
+        }
+
+        // TEMP reset tab content, Menu creates extra div, when addComponent,
+        // addLayout or componentSettings
+        if (activeTab) {
+            activeTab.contentContainer.innerHTML = '';
+        }
+
+        if (tabContainer) {
+            tabContainer.classList.add(EditGlobals.classNames.editGridItems);
+        }
+
+        for (let i = 0, iEnd = components.length; i < iEnd; ++i) {
+            gridElement = createElement(
+                'div',
+                {},
+                {},
+                tabContainer
             );
+
+            // Drag drop new component.
+            (gridElement.onmousedown as any) = function (e: PointerEvent): void {
+                if (sidebar.editMode.dragDrop) {
+                    sidebar.editMode.dragDrop.onDragStart(e, void 0, (dropContext: Cell|Row): void => {
+                        components[i].onDrop(sidebar, dropContext);
+                    });
+                }
+            };
+            gridElement.innerHTML = components[i].text;
+        }
+
+        if (this.activeTab) {
+            this.activeTab.listComponent = true;
+        }
+
+    }
+
+    public getLayoutOptions(): void {
+        if (this.activeTab) {
+            this.activeTab.contentContainer.innerHTML = 'layouts options';
         }
     }
 
-    private removeToolbarSpace(): void {
-        const layouts = this.editMode.dashboard.container.querySelectorAll(
-            '.' + DashboardGlobals.classNames.layout
-        );
+    public updateComponent(): void {
+        const activeTab = this.activeTab;
+        const formFields = activeTab &&
+            activeTab.contentContainer.querySelectorAll(
+                'input, textarea'
+            ) || [];
+        const updatedSettings = {};
+        const mountedComponent = (this.context as Cell).mountedComponent;
+        let fieldId;
 
-        for (let i = 0, iEnd = layouts.length; i < iEnd; ++i) {
-            layouts[i].classList.remove(
-                EditGlobals.classNames.layoutToolbarSpace
-            );
+        for (let i = 0, iEnd = formFields.length; i < iEnd; ++i) {
+            fieldId = formFields[i].getAttribute('id');
+
+            if (fieldId) {
+                try {
+                    (updatedSettings as any)[fieldId] = JSON.parse(
+                        (formFields[i] as HTMLTextAreaElement).value
+                    );
+                } catch {
+                    (updatedSettings as any)[fieldId] =
+                        (formFields[i] as (HTMLInputElement)).value;
+                }
+            }
+        }
+
+        if (mountedComponent) {
+            mountedComponent.update(updatedSettings);
+        }
+    }
+
+    public onDropNewComponent(
+        dropContext: Cell|Row,
+        componentOptions: Bindings.ComponentOptions
+    ): void {
+        const sidebar = this,
+            dragDrop = sidebar.editMode.dragDrop;
+
+        if (dragDrop) {
+            const row = dropContext.getType() === 'cell' ? (dropContext as Cell).row : (dropContext as Row),
+                key = uniqueKey().slice(11), // @ToDo - change it to dashboard unique key generation?
+                newCell = row.addCell({ id: DashboardGlobals.prefix + 'col-' + key });
+
+            dragDrop.onCellDragEnd(newCell);
+            const component = Bindings.addComponent(merge(componentOptions, {
+                cell: newCell.id
+            }));
+            newCell.mountedComponent = component;
         }
     }
 }
 
+interface Sidebar {
+    dragDropButton?: HTMLDOMElement;
+    closeButton?: HTMLDOMElement;
+    componentEditableOptions?: any;
+}
 namespace Sidebar {
     export interface Options {
         enabled: boolean;
         className: string;
-        menu: Menu.Options;
+        dragIcon: string;
+        closeIcon: string;
     }
 
     export interface TabOptions {
         type: string;
         icon: string;
-        items: Array<string>;
+        items: Record<string, Array<string>>;
     }
 
     export interface Tab {
         element: HTMLDOMElement;
         options: TabOptions;
         isActive: boolean;
+        content: Menu;
+        contentContainer: HTMLDOMElement;
+        saveBtn: HTMLDOMElement;
+        listComponent?: boolean;
+    }
+
+    export interface AddComponentDetails {
+        text: string;
+        onDrop: Function;
     }
 }
 

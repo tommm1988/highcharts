@@ -10,6 +10,8 @@
  *
  * */
 
+'use strict';
+
 /* *
  *
  *  Imports
@@ -33,8 +35,10 @@ const { merge } = U;
 
 /**
  * Handles parsing and transformation of an HTML table to a table.
+ *
+ * @private
  */
-class HTMLTableParser extends DataParser<DataParser.EventObject> {
+class HTMLTableParser extends DataParser<DataParser.Event> {
 
     /* *
      *
@@ -104,9 +108,9 @@ class HTMLTableParser extends DataParser<DataParser.EventObject> {
         if (tableElement) {
             this.tableElement = tableElement;
             this.tableElementID = tableElement.id;
-        } else if (options?.tableHTML) {
+        } else if (options && options.tableHTML) {
             this.tableElement = options.tableHTML;
-            this.tableElementID = options?.tableHTML.id;
+            this.tableElementID = options.tableHTML.id;
         }
     }
 
@@ -161,7 +165,7 @@ class HTMLTableParser extends DataParser<DataParser.EventObject> {
 
 
         if (!(tableHTML instanceof HTMLElement)) {
-            parser.emit<DataParser.EventObject>({
+            parser.emit<DataParser.Event>({
                 type: 'parseError',
                 columns,
                 detail: eventDetail,
@@ -173,7 +177,7 @@ class HTMLTableParser extends DataParser<DataParser.EventObject> {
         parser.tableElement = this.tableElement;
         parser.tableElementID = tableHTML.id;
 
-        this.emit<DataParser.EventObject>({
+        this.emit<DataParser.Event>({
             type: 'parse',
             columns: parser.columns,
             detail: eventDetail,
@@ -187,7 +191,7 @@ class HTMLTableParser extends DataParser<DataParser.EventObject> {
             { startRow } = parseOptions;
 
         // Insert headers from the first row
-        if (firstRowAsNames) {
+        if (firstRowAsNames && rowsCount) {
             const items = rows[0].children,
                 itemsLength = items.length;
 
@@ -264,7 +268,7 @@ class HTMLTableParser extends DataParser<DataParser.EventObject> {
         this.columns = columns;
         this.headers = headers;
 
-        this.emit<DataParser.EventObject>({
+        this.emit<DataParser.Event>({
             type: 'afterParse',
             columns,
             detail: eventDetail,

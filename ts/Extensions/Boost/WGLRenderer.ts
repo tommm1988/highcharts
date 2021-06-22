@@ -12,6 +12,7 @@
 
 'use strict';
 
+import type Axis from '../../Core/Axis/Axis';
 import type Chart from '../../Core/Chart/Chart';
 import type ColorString from '../../Core/Color/ColorString';
 import type Point from '../../Core/Series/Point';
@@ -147,7 +148,7 @@ function GLRenderer(
     postRenderCallback: Function
 ): (false|Highcharts.BoostGLRenderer) {
     //  // Shader
-    var shader: Highcharts.BoostGLShader = false as any,
+    let shader: Highcharts.BoostGLShader = false as any,
         // Vertex buffers - keyed on shader attribute name
         vbuffer: Highcharts.BoostGLVertexBuffer = false as any,
         vlen = 0,
@@ -214,7 +215,7 @@ function GLRenderer(
      * @private
      */
     function seriesPointCount(series: Series): number {
-        var isStacked: boolean,
+        let isStacked: boolean,
             xData: Array<number>,
             s: number;
 
@@ -247,7 +248,7 @@ function GLRenderer(
      * @private
      */
     function allocateBuffer(chart: Chart): void {
-        var s = 0;
+        let s = 0;
 
         if (!settings.usePreallocated) {
             return;
@@ -266,7 +267,7 @@ function GLRenderer(
      * @private
      */
     function allocateBufferForSingleSeries(series: Series): void {
-        var s = 0;
+        let s = 0;
 
         if (!settings.usePreallocated) {
             return;
@@ -286,7 +287,7 @@ function GLRenderer(
      * @param {number} height - the height of the viewport in pixels
      */
     function orthoMatrix(width: number, height: number): Array<number> {
-        var near = 0,
+        const near = 0,
             far = 1;
 
         return [
@@ -324,7 +325,7 @@ function GLRenderer(
         series: Series,
         inst: Highcharts.BoostGLSeriesObject
     ): void {
-        var isRange = (
+        let isRange = (
                 series.pointArrayMap &&
                 series.pointArrayMap.join(',') === 'low,high'
             ),
@@ -369,7 +370,6 @@ function GLRenderer(
             lastX: number = false as any,
             lastY: number = false as any,
             minVal: (number|undefined),
-            pcolor: Color.RGBA,
             scolor: Color.RGBA,
             sdata = isStacked ? series.data : (xData || rawData),
             closestLeft = { x: Number.MAX_VALUE, y: 0 },
@@ -397,8 +397,10 @@ function GLRenderer(
             isXInside = false,
             isYInside = true,
             firstPoint = true,
+            zoneAxis = options.zoneAxis || 'y',
             zones = options.zones || false,
-            zoneDefColor: (Color|undefined) = false as any,
+            zoneColors: Array<Color.RGBA>,
+            zoneDefColor: (Color.RGBA|undefined) = false as any,
             threshold: number = options.threshold as any,
             gapSize: number = false as any;
 
@@ -413,20 +415,31 @@ function GLRenderer(
         }
 
         if (zones) {
-            zones.some(function (zone): (boolean) {
-                if (typeof zone.value === 'undefined') {
-                    zoneDefColor = new Color(zone.color);
-                    return true;
+            zoneColors = [];
+
+            zones.forEach(function (zone, i): void {
+                if (zone.color) {
+                    const zoneColor = color(zone.color).rgba as Color.RGBA;
+                    zoneColor[0] /= 255.0;
+                    zoneColor[1] /= 255.0;
+                    zoneColor[2] /= 255.0;
+                    zoneColors[i] = zoneColor;
+
+                    if (!zoneDefColor && typeof zone.value === 'undefined') {
+                        zoneDefColor = zoneColor;
+                    }
                 }
-                return false;
             });
 
             if (!zoneDefColor) {
-                zoneDefColor = (
+                const seriesColor = (
                     (series.pointAttribs && series.pointAttribs().fill) ||
                     series.color
-                ) as any;
-                zoneDefColor = new Color(zoneDefColor as any);
+                );
+                zoneDefColor = color(seriesColor).rgba as Color.RGBA;
+                zoneDefColor[0] /= 255.0;
+                zoneDefColor[1] /= 255.0;
+                zoneDefColor[2] /= 255.0;
             }
         }
 
@@ -569,7 +582,7 @@ function GLRenderer(
             }
 
             points.forEach(function (point: Point): void {
-                var plotY = point.plotY,
+                let plotY = point.plotY,
                     swidth,
                     pointAttr;
 
@@ -779,12 +792,12 @@ function GLRenderer(
 
             if (x > xMax && closestRight.x < xMax) {
                 closestRight.x = x;
-                closestRight.y = y as any;
+                closestRight.y = y;
             }
 
             if (x < xMin && closestLeft.x > xMin) {
                 closestLeft.x = x;
-                closestLeft.y = y as any;
+                closestLeft.y = y;
             }
 
             if (y === null && connectNulls) {
@@ -816,28 +829,33 @@ function GLRenderer(
 
             // Note: Boost requires that zones are sorted!
             if (zones) {
-                pcolor = (zoneDefColor as any).rgba;
+                let zoneColor: Color.RGBA|undefined;
                 zones.some(function ( // eslint-disable-line no-loop-func
                     zone: SeriesZonesOptions,
                     i: number
                 ): boolean {
-                    var last: SeriesZonesOptions =
-                            (zones as any)[i - 1];
+                    const last: SeriesZonesOptions = (zones as any)[i - 1];
+
+                    if (zoneAxis === 'x') {
+                        if (typeof zone.value !== 'undefined' && x <= zone.value) {
+                            if (zoneColors[i] && (!last || x >= (last.value as any))) {
+                                zoneColor = zoneColors[i];
+                            }
+                            return true;
+                        }
+                        return false;
+                    }
 
                     if (typeof zone.value !== 'undefined' && y <= zone.value) {
-                        if (!last || y >= (last.value as any)) {
-                            pcolor = color(zone.color).rgba as any;
-
+                        if (zoneColors[i] && (!last || y >= (last.value as any))) {
+                            zoneColor = zoneColors[i];
                         }
                         return true;
                     }
                     return false;
                 });
 
-                (pcolor as any)[0] /= 255.0;
-                (pcolor as any)[1] /= 255.0;
-                (pcolor as any)[2] /= 255.0;
-
+                pcolor = zoneColor || zoneDefColor || pcolor;
             }
 
             // Skip translations - temporary floating point fix
@@ -1110,7 +1128,7 @@ function GLRenderer(
      * @private
      * @param axis {Highcharts.Axis} - the x-axis
      */
-    function setXAxis(axis: Highcharts.Axis): void {
+    function setXAxis(axis: Axis): void {
         if (!shader) {
             return;
         }
@@ -1131,7 +1149,7 @@ function GLRenderer(
      * @private
      * @param axis {Highcharts.Axis} - the y-axis
      */
-    function setYAxis(axis: Highcharts.Axis): void {
+    function setYAxis(axis: Axis): void {
         if (!shader) {
             return;
         }
@@ -1206,7 +1224,7 @@ function GLRenderer(
             s: Highcharts.BoostGLSeriesObject,
             si: number
         ): void {
-            var options = s.series.options,
+            let options = s.series.options,
                 shapeOptions = options.marker,
                 sindex,
                 lineWidth = (
@@ -1238,10 +1256,7 @@ function GLRenderer(
 
             if (
                 s.segments.length === 0 ||
-                (
-                    (s as any).segmentslength &&
-                    s.segments[0].from === s.segments[0].to
-                )
+                s.segments[0].from === s.segments[0].to
             ) {
                 return;
             }
@@ -1325,6 +1340,10 @@ function GLRenderer(
                 cbuffer = GLVertexBuffer(gl, shader); // eslint-disable-line new-cap
                 cbuffer.build(s.colorData, 'aColor', 4);
                 cbuffer.bind();
+            } else {
+                // #15869, a buffer with fewer points might already be bound by
+                // a different series/chart causing out of range errors
+                gl.disableVertexAttribArray(1);
             }
 
             // Set series specific uniforms
@@ -1443,7 +1462,7 @@ function GLRenderer(
      * @param canvas {HTMLCanvas} - the canvas to render to
      */
     function init(canvas?: HTMLCanvasElement, noFlush?: boolean): boolean {
-        var i = 0,
+        let i = 0,
             contexts = [
                 'webgl',
                 'experimental-webgl',
@@ -1501,7 +1520,7 @@ function GLRenderer(
             name: string,
             fn: Highcharts.BoostGLTextureCallbackFunction
         ): void {
-            var props: Highcharts.BoostGLTextureObject = {
+            const props: Highcharts.BoostGLTextureObject = {
                     isReady: false,
                     texture: doc.createElement('canvas'),
                     handle: gl.createTexture()

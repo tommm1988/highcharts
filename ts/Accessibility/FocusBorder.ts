@@ -16,6 +16,8 @@ import type {
     DOMElementType
 } from '../Core/Renderer/DOMElementType';
 import type SVGAttributes from '../Core/Renderer/SVG/SVGAttributes';
+
+import Chart from '../Core/Chart/Chart.js';
 import H from '../Core/Globals.js';
 import SVGElement from '../Core/Renderer/SVG/SVGElement.js';
 import SVGLabel from '../Core/Renderer/SVG/SVGLabel.js';
@@ -39,15 +41,13 @@ declare module '../Core/Chart/ChartLike'{
     }
 }
 
-declare global {
-    namespace Highcharts {
-        interface SVGElement {
-            focusBorder?: SVGElement;
-            /** @requires modules/accessibility */
-            addFocusBorder(margin: number, attribs: SVGAttributes): void;
-            /** @requires modules/accessibility */
-            removeFocusBorder(): void;
-        }
+declare module '../Core/Renderer/SVG/SVGElementLike' {
+    interface SVGElementLike {
+        focusBorder?: SVGElement;
+        /** @requires modules/accessibility */
+        addFocusBorder(margin: number, attribs: SVGAttributes): void;
+        /** @requires modules/accessibility */
+        removeFocusBorder(): void;
     }
 }
 
@@ -79,7 +79,9 @@ function addDestroyFocusBorderHook(el: SVGElement): void {
     const origDestroy = el.destroy;
 
     el.destroy = function (): undefined {
-        el.focusBorder?.destroy?.();
+        if (el.focusBorder && el.focusBorder.destroy) {
+            el.focusBorder.destroy();
+        }
         return origDestroy.apply(el, arguments);
     };
 
@@ -300,7 +302,7 @@ extend(SVGElement.prototype, {
  * @private
  * @function Highcharts.Chart#renderFocusBorder
  */
-H.Chart.prototype.renderFocusBorder = function (this: Highcharts.AccessibilityChart): void {
+Chart.prototype.renderFocusBorder = function (this: Highcharts.AccessibilityChart): void {
     const focusElement = this.focusElement,
         focusBorderOptions: (
             Highcharts.AccessibilityKeyboardNavigationFocusBorderOptions
@@ -312,7 +314,7 @@ H.Chart.prototype.renderFocusBorder = function (this: Highcharts.AccessibilityCh
         if (focusBorderOptions.enabled) {
             focusElement.addFocusBorder(focusBorderOptions.margin, {
                 stroke: focusBorderOptions.style.color,
-                'stroke-width': focusBorderOptions.style.lineWidth,
+                strokeWidth: focusBorderOptions.style.lineWidth,
                 r: focusBorderOptions.style.borderRadius
             });
         }
@@ -334,12 +336,12 @@ H.Chart.prototype.renderFocusBorder = function (this: Highcharts.AccessibilityCh
  *        If supplied, it draws the border around svgElement and sets the focus
  *        to focusElement.
  */
-H.Chart.prototype.setFocusToElement = function (
+Chart.prototype.setFocusToElement = function (
     this: Highcharts.AccessibilityChart,
     svgElement: SVGElement,
     focusElement?: DOMElementType
 ): void {
-    var focusBorderOptions: (
+    const focusBorderOptions: (
             Highcharts.AccessibilityKeyboardNavigationFocusBorderOptions
         ) = this.options.accessibility.keyboardNavigation.focusBorder,
         browserFocusElement = focusElement || svgElement.element;

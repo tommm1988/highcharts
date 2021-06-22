@@ -13,6 +13,7 @@ body {
     padding: 20px 10px;
     position: relative;
     overflow: hidden;
+    min-height: 500px;
 }
 
 .main-title {
@@ -26,9 +27,15 @@ body {
 
 .hcd-cell {
     position: relative;
-    flex-shrink: 1;
-    flex-basis: auto;
+    /*flex-shrink: 1;*/
+    /*flex-basis: auto;*/
     flex: 1;
+    min-width: 20px;
+    /*flex: auto;*/
+}
+
+.hcd-layout {
+    position: relative;
 }
 
 .hcd-layout .hcd-row,
@@ -46,6 +53,55 @@ body {
 
 .hcd-edit-menu.hcd-edit-toolbar-row .hcd-edit-menu-item {
     float: left;
+}
+
+.hcd-edit-drop-pointer {
+    position: absolute;
+    z-index: 9999;
+    display: none;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+        45deg,
+        rgba(3, 104, 8, 0.58),
+        rgba(3, 104, 8, 0.58) 10px,
+        rgba(4, 134, 11, 0.2) 10px,
+        rgba(4, 134, 11, 0.2) 20px
+    );
+    opacity: 0.5;
+    transition: 0.1s;
+    border-radius: 2px;
+}
+
+.hcd-edit-drag-mock {
+    position: absolute;
+    top: 100px;
+    left: 100px;
+    height: 50px;
+    width: 50px;
+    z-index: 99999;
+    display: none;
+    cursor: grab;
+    pointer-events: none;
+    background-color: rgb(255, 255, 255);
+    box-shadow: 0 0.46875rem 2.1875rem rgba(4, 9, 20, 0.03), 0 0.9375rem 1.40625rem rgba(4, 9, 20, 0.03), 0 0.25rem 0.53125rem rgba(4, 9, 20, 0.05), 0 0.125rem 0.1875rem rgba(4, 9, 20, 0.03);
+}
+
+.hcd-edit-resize-pointer {
+    position: absolute;
+    z-index: 100;
+    display: none;
+    pointer-events: none;
+    border: 4px solid #2196F3;
+    opacity: 0.5;
+}
+
+.hcd-edit-ctx-detection-pointer {
+    position: absolute;
+    z-index: 101;
+    display: none;
+    pointer-events: none;
+    border: 3px solid rgb(128, 133, 232);
+    opacity: 0.6;
 }
 
 // .hcd-layout.edit-mode .hcd-row :hover .hcd-cell  {
@@ -81,8 +137,6 @@ body {
 .hcd-cell > .hcd-component {
     position: relative;
     margin: 5px;
-    padding: 5px;
-
     background-color: #fff;
     box-shadow: 0 0.46875rem 2.1875rem rgba(4, 9, 20, 0.03), 0 0.9375rem 1.40625rem rgba(4, 9, 20, 0.03), 0 0.25rem 0.53125rem rgba(4, 9, 20, 0.05), 0 0.125rem 0.1875rem rgba(4, 9, 20, 0.03);
     background-clip: border-box;
@@ -96,25 +150,30 @@ body {
 
 .hcd-edit-resize-snap {
     position: absolute;
-    /*background: red;*/
-    opacity: 0.5;
-    z-index: 10;
+    background: #fff;
+    border-radius: 9999px;
+    border: 1px solid gray;
+    z-index: 1000;
 }
 
 .hcd-edit-resize-snap-x {
     cursor: col-resize;
     width: 20px;
-    height: 100%;
+    height: 20px;
     right: 0px;
     top: 0px;
 }
 
 .hcd-edit-resize-snap-y {
     cursor: row-resize;
-    width: 100%;
+    width: 20px;
     height: 20px;
     left: 0px;
     bottom: 0px;
+}
+
+.hcd-edit-resizer-menu-btn-active {
+    color: #2196F3;
 }
 
 .hcd-cell > .hcd-component .title-wrapper {
@@ -172,7 +231,7 @@ body {
 
 }
 
-.hcd-edit-switch-wrapper {
+.hcd-edit-toggle-wrapper {
     position: relative;
     display: inline-block;
     width: 43px;
@@ -181,13 +240,13 @@ body {
     margin-top: -4px;
 }
 
-.hcd-edit-switch-wrapper input {
+.hcd-edit-toggle-wrapper input {
     opacity: 0;
     width: 0;
     height: 0;
 }
 
-.hcd-edit-switch-slider {
+.hcd-edit-toggle-slider {
     position: absolute;
     cursor: pointer;
     top: 0;
@@ -200,7 +259,7 @@ body {
     border-radius: 34px;
 }
 
-.hcd-edit-switch-slider:before {
+.hcd-edit-toggle-slider:before {
     position: absolute;
     content: "";
     height: 16px;
@@ -213,15 +272,15 @@ body {
     border-radius: 50%;
 }
 
-.hcd-edit-switch-wrapper input:checked + .hcd-edit-switch-slider {
+.hcd-edit-toggle-wrapper input:checked + .hcd-edit-toggle-slider {
     background-color: #2196F3;
 }
 
-.hcd-edit-switch-wrapper input:focus + .hcd-edit-switch-slider {
+.hcd-edit-toggle-wrapper input:focus + .hcd-edit-toggle-slider {
     box-shadow: 0 0 1px #2196F3;
 }
 
-.hcd-edit-switch-wrapper input:checked + .hcd-edit-switch-slider:before {
+.hcd-edit-toggle-wrapper input:checked + .hcd-edit-toggle-slider:before {
     -webkit-transform: translateX(18px);
     -ms-transform: translateX(18px);
     transform: translateX(18px);
@@ -240,8 +299,13 @@ body {
 }
 
 .block,
-.show-edit {
+.show-edit
+.show {
     display: block;
+}
+
+.hide {
+    display: none;
 }
 
 h1 {
@@ -289,7 +353,7 @@ h1 {
     padding: 5px;
     cursor: pointer;
     border-radius: 3px;
-
+    float: right;
     div {
         height: 4px;
         background-color: #555;
@@ -303,6 +367,11 @@ h1 {
 
 .hcd-edit-menu-item {
     display: none;
+}
+
+.hcd-edit-tools {
+    overflow:hidden;
+    width: 100%;
 }
 
 .hcd-edit-context-menu-item {
@@ -334,22 +403,76 @@ h1 {
     box-shadow: 0 0.46875rem 2.1875rem rgba(4, 9, 20, 0.03), 0 0.9375rem 1.40625rem rgba(4, 9, 20, 0.03), 0 0.25rem 0.53125rem rgba(4, 9, 20, 0.05), 0 0.125rem 0.1875rem rgba(4, 9, 20, 0.03);
 }
 
-.hcd-edit-toolbar-item {
-    min-width: 40px;
-    min-height: 40px;
+.hcd-edit-toolbar-item div {
+    min-width: 25px;
+    min-height: 25px;
     box-sizing: border-box;
     text-align: center;
     padding: 10px 5px;
-    background-size: 28px 28px;
+    background-size: 23px 23px;
     background-repeat: no-repeat;
     background-position: 50% 50%;
 }
 
-.hcd-edit-toolbar-item.hcd-edit-menu-destroy {
-    background-color: #e01d5a;
+.hcd-edit-toolbar-row {
+    .hcd-edit-toolbar-item {
+        background: #8aea9f;
+
+        div {
+            min-width: 23px;
+            min-height: 23px;
+            background-size: 21px 21px;
+        }
+
+        div:first-child:before {
+            content: "";
+            border: solid transparent;
+            border-right-color: #8aea9f;
+            border-width: 23px 10px 0 0;
+            right: 100%;
+            position: absolute;
+            top: 0px;
+        }
+
+        div:last-child:after {
+            content: "";
+            border: solid transparent;
+            border-left-color: #8aea9f;
+            border-width: 23px 0 0 10px;
+            left: 100%;
+            position: absolute;
+            top: 0px;
+        }
+    }
 }
 
-.hcd-edit-toolbar-item:hover {
+.hcd-edit-toolbar-cell {
+    .hcd-edit-toolbar-item {
+        background: #30436b;
+    }
+}
+
+.hcd-edit-toolbar-cell-outline {
+    position: absolute;
+    pointer-events: none;
+    display: none;
+    border: 2px dashed #30436b;
+    opacity: 1;
+}
+
+.hcd-edit-toolbar-row-outline {
+    position: absolute;
+    pointer-events: none;
+    display: none;
+    border: 2px solid #8aea9f;
+    opacity: 1;
+}
+
+// .hcd-edit-toolbar-item.hcd-edit-menu-destroy div {
+//     background-color: #e01d5a;
+// }
+
+.hcd-edit-toolbar-item:hover div {
     cursor: pointer;
     background-color: #4B4B4D;
 }
@@ -370,32 +493,112 @@ h1 {
     color:#a6a6a6;
     position: absolute;
     z-index: 1000;
-    height: 100%;
+    min-height: 500px;
+    height: auto;
     width: 200px;
+    display: none;
+}
+
+.hcd-edit-sidebar-tab-btn,
+.hcd-edit-sidebar .hcd-edit-button.hcd-edit-sidebar-tab-btn {
+    margin-top: 10px;
+}
+
+.hcd-edit-tools-btn {
+    border: none;
+    display: inline-block;
+    padding: 4px 10px 4px 30px;
+    background-color: transparent;
+    border: 1px solid transparent;
+    background-repeat: no-repeat;
+    background-size: 22px;
+    background-position-y: 4px;
+    float: right;
+}
+
+.hcd-edit-tools-btn:hover {
+    border: 1px solid #4B4B4D;
+}
+
+.hcd-edit-sidebar-item {
+    font-size: 0.876em;
+}
+
+.hcd-edit-sidebar-item input,
+.hcd-edit-sidebar-item textarea,
+.hcd-edit-sidebar-item select {
+    border: none;
+    background: #4f4f51;
+    width: 100%;
+    color: #fff ;
+}
+
+.hcd-edit-sidebar .hcd-edit-button,
+.hcd-edit-sidebar-item button {
+    padding: 5px 10px;
+    float: right;
+    margin-top: 20px;
+    border: none;
+    background: #aac6ff;
+}
+
+.hcd-edit-sidebar-button-nav {
+    min-width: 34px;
+    min-height: 34px;
+    background-position: 50% 50%;
+}
+
+.hcd-edit-sidebar .hcd-edit-button {
+    float: right;
+    margin-top: 0px;
 }
 
 .hcd-edit-sidebar-show {
-    transition: 1s;
+    /* transition: 1s;*/
+    display: block;
     left: 0;
 }
 
-.hcd-edit-layout-toolbar-space {
-    transition: 1s;
-    margin-left: 200px;  
+.hcd-edit-label-text {
+    display: inline-block;
 }
 
-// .hcd-edit-sidebar-hide {
-//     transition: 1s;
-//     left: -200px;
-// }
+.hcd-edit-popup-content .hcd-edit-label-text {
+    width: 100%;
+}
 
 .hcd-edit-sidebar-title {
-    width: 100%;
-    text-align: center;
     padding: 5px;
     text-transform: uppercase;
     background: #141414;
     border-bottom: 1px solid #444;
+}
+
+.hcd-edit-sidebar-tab-wrapper {
+    display: none;
+}
+
+.hcd-edit-sidebar-tab-wrapper.current {
+    display: block;
+}
+
+.hcd-edit-grid-items {
+    
+}
+
+.hcd-edit-grid-items div {
+    width: calc(50% - 20px);
+    clear: both;
+    margin: 10px;
+    padding: 10px;
+    text-align: center;
+    display: inline-block;
+    background-color: #474747;
+    cursor: grab;
+}
+
+.hcd-edit-grid-items div:hover {
+    background-color :#aac6ff; 
 }
 
 .hcd-edit-sidebar-tabs {
@@ -415,6 +618,11 @@ h1 {
     font-size: 0.876em;
 }
 
+.hcd-edit-sidebar-tab-content {
+    display: none;
+    padding: 10px;
+}
+
 .hcd-edit-sidebar-tab:hover,
 .hcd-edit-toolbar-tab-active {
     cursor: pointer;
@@ -422,10 +630,48 @@ h1 {
     border-color: #aac6ff;
 }
 
+.hcd-edit-mask {
+    opacity: 0.3
+}
 
-.hcd-edit-hidden-cells .hcd-cell:not(.hcd-edit-current-cell),
-.hcd-edit-hidden-rows .hcd-row:not(.hcd-edit-current-row) {
-    opacity: 0.3;
+// popup
+@import '../annotations/popup.scss';
+
+.highcharts-popup {
+    min-height: 160px;
+    width: 200px;
+    left: calc(50% - 150px);
+}
+
+.highcharts-popup .hcd-edit-popup-content {
+    padding-top: 60px;
+    clear: both;
+    text-align: center;
+}
+
+.highcharts-popup .hcd-edit-popup-content button {
+    float: none;
+}
+
+.highcharts-popup .hcd-edit-popup-content.hcd-edit-label-text {
+    width: 100%;
+    padding: 10px 0px;
+}
+
+.highcharts-popup .hcd-edit-popup-content button.hcd-edit-popup-confirm-btn {
+    background-color: #e01d5a;
+    color: #000;
+}
+
+.hcd-edit-overlay {
+    background:rgba(0, 0, 0, 0.3);
+    display: none;
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    z-index: 1;
+    left: 0px;
+    top: 0px;
 }
 
 @media (max-width: 728px) {

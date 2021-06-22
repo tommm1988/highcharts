@@ -1,9 +1,20 @@
+/* eslint-disable require-jsdoc */
 import type ComponentType from './ComponentType';
+import type StoreType from '../../Data/Stores/StoreType';
+import type CSVStore from '../../Data/Stores/CSVStore';
+import type HTMLTableStore from '../../Data/Stores/HTMLTableStore';
+import type GoogleSheetsStore from '../../Data/Stores/GoogleSheetsStore';
+import Cell from '../Layout/Cell.js';
 import type DataEventEmitter from '../../Data/DataEventEmitter';
 import type DataStore from '../../Data/Stores/DataStore';
+import type DataModifier from '../../Data/Modifiers/DataModifier';
+import DataTable from '../../Data/DataTable.js';
 import type DataJSON from '../../Data/DataJSON';
 import type CSSObject from '../../Core/Renderer/CSSObject';
 import type TextOptions from './TextOptions';
+import type Row from '../Layout/Row';
+import EditableOptions from './EditableOptions.js';
+import CallbackRegistry from '../CallbackRegistry.js';
 import U from '../../Core/Utilities.js';
 const {
     createElement,
@@ -17,7 +28,10 @@ const {
     relativeLength
 } = U;
 
-abstract class Component<TEventObject extends Component.Event = Component.Event> {
+import { getMargins, getPaddings } from './Utils.js';
+import ComponentGroup from './ComponentGroup.js';
+
+abstract class Component<TEventObject extends Component.EventTypes = Component.EventTypes> {
 
     /**
      *
@@ -32,7 +46,7 @@ abstract class Component<TEventObject extends Component.Event = Component.Event>
      * Record of component instances
      *
      */
-    public static instanceRegistry: Record<string, Component<any>> = {};
+    public static instanceRegistry: Record<string, ComponentType> = {};
 
     /**
      * Regular expression to extract the  name (group 1) from the
@@ -86,8 +100,9 @@ abstract class Component<TEventObject extends Component.Event = Component.Event>
      * @param {Component} component
      * The component to add
      */
-    public static addInstance(component: Component<any>): void {
+    public static addInstance(component: ComponentType): void {
         Component.instanceRegistry[component.id] = component;
+
     }
 
     /**
@@ -118,63 +133,141 @@ abstract class Component<TEventObject extends Component.Event = Component.Event>
         return ids.map((id): Component<any> => this.instanceRegistry[id]);
     }
 
-    public static getInstanceById(id: string): Component | undefined {
+    public static getInstanceById(id: string): ComponentType | undefined {
         return this.instanceRegistry[id];
     }
 
     public static relayMessage(
-        sender: Component<any>, // Possibly layout?
-        message: (string | MessageEvent), // should probably be a typical event with optional payloads
-        target: string = 'all' // currently all or type. Could also add groups
+        sender: ComponentType | ComponentGroup, // Are there cases where a group should be the sender?
+        message: Component.MessageEvent['message'],
+        targetObj: Component.MessageTarget
     ): void {
-        this.getAllInstanceIDs()
-            .filter((id): boolean => id !== sender.id)
-            .forEach((componentID): void => {
-                const component = this.instanceRegistry[componentID];
-                if (component.type === target || target === 'all') {
-                    component.emit({
-                        type: 'message',
-                        detail: {
-                            sender,
-                            target
-                        },
-                        message
+        const emit = (component: ComponentType): void =>
+            component.emit({
+                type: 'message',
+                detail: {
+                    sender: sender.id,
+                    target: targetObj.target
+                },
+                message,
+                target: component
+            });
+
+        const handlers: Record<Component.MessageTarget['type'], Function> = {
+            'componentID': (recipient: Component.MessageTarget['target']): void => {
+                const component = this.getInstanceById(recipient);
+                if (component) {
+                    emit(component);
+                }
+            },
+            'componentType': (recipient: Component.MessageTarget['target']): void => {
+                this.getAllInstanceIDs()
+                    .forEach((instanceID): void => {
+                        const component = this.getInstanceById(instanceID);
+                        if (component && component.id !== sender.id) {
+                            if (component.type === recipient || recipient === 'all') {
+                                emit(component);
+                            }
+                        }
+                    });
+            },
+            'group': (recipient: Component.MessageTarget['target']): void => {
+                // Send a message to a whole group
+                const group = ComponentGroup.getComponentGroup(recipient);
+                if (group) {
+                    group.components.forEach((id): void => {
+                        const component = this.getInstanceById(id);
+                        if (component && component.id !== sender.id) {
+                            emit(component);
+                        }
                     });
                 }
-            });
+            }
+        };
+
+        handlers[targetObj.type](targetObj.target);
     }
 
     protected static getUUID(): string {
         return 'dashboard-component-' + uniqueKey();
     }
 
+    public static createTextElement(
+        tagName: string,
+        elementName: string,
+        textOptions: Component.textOptionsType
+    ): HTMLElement | undefined {
+        const classBase = 'hcd';
+
+        if (typeof textOptions === 'object') {
+            const { className, text, style } = textOptions;
+            return createElement(tagName, {
+                className: className || `${classBase}-component-${elementName}`,
+                textContent: text
+            }, style);
+        }
+
+        if (typeof textOptions === 'string') {
+            return createElement(tagName, {
+                className: `${classBase}-component-${elementName}`,
+                textContent: textOptions
+            });
+        }
+    }
     public static defaultOptions: Component.ComponentOptions = {
         className: 'hcd-component',
         parentElement: document.body,
+        parentCell: void 0,
         type: '',
         id: '',
         title: false,
         caption: false,
+        style: {
+            display: 'flex',
+            'flex-direction': 'column'
+        },
         editableOptions: [
-            'dimensions',
             'id',
             'store',
-            'style'
-        ]
+            'style',
+            'title',
+            'caption'
+        ],
+        editableOptionsBindings: void 0
     }
 
     public parentElement: HTMLElement;
-    public store?: DataStore<any>; // the attached store
-    public dimensions: { width: number | null; height: number | null };
+    public parentCell?: Cell;
+    public store?: Component.StoreTypes; // the attached store
+    protected dimensions: { width: number | null; height: number | null };
     public element: HTMLElement;
     public titleElement?: HTMLElement;
     public captionElement?: HTMLElement;
+    public contentElement: HTMLElement;
     public options: Component.ComponentOptions;
     public type: string;
     public id: string;
+    public editableOptions: EditableOptions;
+    public callbackRegistry = new CallbackRegistry();
     private tableEventTimeout?: number;
     private tableEvents: Function[] = [];
+    private cellListeners: Function[] = [];
     protected hasLoaded: boolean;
+
+    public presentationModifier?: DataModifier;
+    public presentationTable?: DataTable;
+
+    public activeGroup: ComponentGroup | undefined = void 0;
+
+    /**
+     * Timeouts for calls to `Component.resizeTo()`
+     */
+    protected resizeTimeouts: number[] = [];
+
+    /**
+     * Timeouts for resizing the content. I.e. `chart.setSize()`
+     */
+    protected innerResizeTimeouts: number[] = [];
 
     constructor(options: Partial<Component.ComponentOptions>) {
         this.options = merge(Component.defaultOptions, options);
@@ -182,6 +275,7 @@ abstract class Component<TEventObject extends Component.Event = Component.Event>
             this.options.id :
             Component.getUUID();
 
+        // Todo: we might want to handle this later
         if (typeof this.options.parentElement === 'string') {
             const el = document.getElementById(this.options.parentElement);
             if (!el) {
@@ -193,9 +287,21 @@ abstract class Component<TEventObject extends Component.Event = Component.Event>
             this.parentElement = this.options.parentElement;
         }
 
+        if (this.options.parentCell) {
+            this.parentCell = this.options.parentCell;
+            if (this.parentCell.container) {
+                this.parentElement = this.parentCell.container;
+            }
+            this.attachCellListeneres();
+        }
+
         this.type = this.options.type;
         this.store = this.options.store;
         this.hasLoaded = false;
+        this.editableOptions = new EditableOptions(this, options.editableOptionsBindings);
+
+        this.presentationModifier = this.options.presentationModifier;
+
         // Initial dimensions
         this.dimensions = {
             width: null,
@@ -204,42 +310,126 @@ abstract class Component<TEventObject extends Component.Event = Component.Event>
 
         this.element = createElement('div', {
             className: this.options.className
-        });
+        }, this.options.style);
 
-        // Add the component instance to the registry
-        Component.addInstance(this);
+        this.contentElement = createElement('div', {
+            className: `${this.options.className}-content`
+        }, {
+            height: '100%'
+        }, void 0, true);
+
     }
 
-    public setStore(store: DataStore<any> | undefined): this {
-        this.store = store;
-        if (store) {
-            // Set up event listeners
-            [
-                'afterInsertRow',
-                'afterDeleteRow',
-                'afterChangeRow',
-                'afterUpdateRow',
-                'afterClearTable'
-            ].forEach((event: any): void => {
-                this.tableEvents.push(store.table.on(event, (e): void => {
+    // Setup listeners on cell/other things up the chain
+    private attachCellListeneres(): void {
+        // remove old listeners
+        while (this.cellListeners.length) {
+            const destroy = this.cellListeners.pop();
+            if (destroy) {
+                destroy();
+            }
+        }
 
-                    clearInterval(this.tableEventTimeout);
-                    this.tableEventTimeout = setTimeout((): void => {
-                        this.emit({
-                            ...e as any,
-                            type: 'tableChanged'
-                        });
-                        this.tableEventTimeout = void 0;
-                    }, 0);
+        if (this.parentCell) {
+            const dashboard = this.parentCell.row.layout.dashboard;
+            this.cellListeners.push(
+                // Listen for resize on dashboard
+                addEvent(dashboard, 'cellResize', (): void => {
+                    this.resizeTo(this.parentElement);
+                }),
+                // Listen for changed parent
+                addEvent(this.parentCell.row, 'cellChange', (e: { row: Row }): void => {
+                    const { row } = e;
+                    if (row && this.parentCell) {
+                        const hasLeftTheRow = row.getCellIndex(this.parentCell) === void 0;
+                        if (hasLeftTheRow) {
+                            if (this.parentCell) {
+                                this.setCell(this.parentCell);
+                            }
+                        }
+                    }
                 }));
-            });
 
-            this.tableEvents.push(store.on('afterLoad', (e): void => {
+        }
+    }
+
+    // Set a parent cell
+    public setCell(cell: Cell, resize = false): void {
+        this.parentCell = cell;
+        if (cell.container) {
+            this.parentElement = cell.container;
+        }
+        this.attachCellListeneres();
+        if (resize) {
+            this.resizeTo(this.parentElement);
+        }
+    }
+
+    private setupTableListeners(table: DataTable): void {
+        [
+            'afterSetRows',
+            'afterDeleteRows',
+            'afterSetColumns',
+            'afterDeleteColumns'
+        ].forEach((event: any): void => {
+            if (this.store && table) {
+                this.tableEvents.push((table)
+                    .on(event, (e: any): void => {
+                        clearInterval(this.tableEventTimeout);
+                        this.tableEventTimeout = setTimeout((): void => {
+                            this.emit({
+                                ...e,
+                                type: 'tableChanged'
+                            });
+                            this.tableEventTimeout = void 0;
+                        }, 0);
+                    }));
+            }
+        });
+
+
+        if (this.store) {
+            const component = this;
+            this.tableEvents.push(this.store.on('afterLoad', (): void => {
                 this.emit({
-                    ...e,
+                    target: component,
                     type: 'tableChanged'
                 });
             }));
+        }
+    }
+
+    private clearTableListeners(): void {
+        if (this.tableEvents.length) {
+            this.tableEvents.forEach((removeEventCallback): void => removeEventCallback());
+        }
+
+        if (this.store) {
+            this.tableEvents.push(this.store.table.on('afterSetModifier', (e): void => {
+                if (e.type === 'afterSetModifier') {
+                    this.emit({
+                        ...e,
+                        type: 'tableChanged'
+                    });
+                }
+            }));
+        }
+    }
+
+    public setStore(store: Component.StoreTypes | undefined): this {
+        this.store = store;
+        if (this.store) {
+            // Set up event listeners
+            this.clearTableListeners();
+            this.setupTableListeners(this.store.table);
+
+            // re-setup if modifier changes
+            this.store.table.on('setModifier', (): void => this.clearTableListeners());
+            this.store.table.on('afterSetModifier', (e): void => {
+                if (e.type === 'afterSetModifier' && e.modified) {
+                    this.setupTableListeners(e.modified);
+                }
+            });
         }
 
         // Clean up old event listeners
@@ -252,8 +442,51 @@ abstract class Component<TEventObject extends Component.Event = Component.Event>
             }
         }
 
+        // Add the component to a group based on the store table id by default
+        // TODO: make this configurable
+        if (this.store) {
+            const tableID = this.store.table.id;
+
+            if (!ComponentGroup.getComponentGroup(tableID)) {
+                ComponentGroup.addComponentGroup(new ComponentGroup(tableID));
+            }
+            const group = ComponentGroup.getComponentGroup(tableID);
+            if (group) {
+                group.addComponents([this.id]);
+                this.activeGroup = group;
+            }
+        }
+
         fireEvent(this, 'storeAttached', { store });
         return this;
+    }
+
+    setActiveGroup(group: ComponentGroup | string | null): void {
+        if (typeof group === 'string') {
+            group = ComponentGroup.getComponentGroup(group) || null;
+        }
+        if (group instanceof ComponentGroup) {
+            this.activeGroup = group;
+        }
+        if (group === null) {
+            this.activeGroup = void 0;
+        }
+        if (this.activeGroup) {
+            this.activeGroup.addComponents([this.id]);
+        }
+    }
+
+
+    private getContentHeight(): number {
+        const parentHeight = this.dimensions.height || Number(getStyle(this.element, 'height'));
+        const titleHeight = this.titleElement ?
+            this.titleElement.clientHeight + getMargins(this.titleElement).y :
+            0;
+        const captionHeight = this.captionElement ?
+            this.captionElement.clientHeight + getMargins(this.captionElement).y :
+            0;
+
+        return parentHeight - titleHeight - captionHeight;
     }
 
     /**
@@ -266,33 +499,25 @@ abstract class Component<TEventObject extends Component.Event = Component.Event>
      * The height to set the component to.
      * Can be pixels, a percentage string or null.
      * Null will unset the style
-     *
-     * @return {this} this
      */
     public resize(
         width?: number | string | null,
         height?: number | string | null
-    ): this {
-
-        // If undefined, and parent has set style,
-        // set to parents height minus padding, margin, etc
-        if (height === void 0 && this.parentElement.style.height) {
-            height = '100%';
-        }
-
-        if (width === void 0 && this.parentElement.style.width) {
-            width = '100%';
-        }
+    ): void {
+        // if (!this.resizeTimeout) {
+        //     this.resizeTimeout = requestAnimationFrame(() => {
 
         if (height) {
-            // Get offset for border, padding, margin
-            const diff = this.element.offsetHeight - Number(getStyle(this.element, 'height'));
-            this.dimensions.height = relativeLength(height, Number(getStyle(this.parentElement, 'height')), -diff);
+            // Get offset for border, padding
+            const pad = getPaddings(this.element).y + getMargins(this.element).y;
+
+            this.dimensions.height = relativeLength(height, Number(getStyle(this.parentElement, 'height'))) - pad;
             this.element.style.height = this.dimensions.height + 'px';
+            this.contentElement.style.height = this.getContentHeight() + 'px';
         }
         if (width) {
-            const diff = this.element.offsetWidth - Number(getStyle(this.element, 'width'));
-            this.dimensions.width = relativeLength(width, Number(getStyle(this.parentElement, 'width')), -diff);
+            const pad = getPaddings(this.element).x + getMargins(this.element).x;
+            this.dimensions.width = relativeLength(width, Number(getStyle(this.parentElement, 'width'))) - pad;
             this.element.style.width = this.dimensions.width + 'px';
         }
 
@@ -310,7 +535,28 @@ abstract class Component<TEventObject extends Component.Event = Component.Event>
             width,
             height
         });
-        return this;
+        //         cancelAnimationFrame(this.resizeTimeout)
+        //         this.resizeTimeout = 0;
+        //     });
+        // }
+    }
+
+    public resizeTo(element: HTMLElement): void {
+        while (this.resizeTimeouts.length) {
+            const timeout = this.resizeTimeouts.pop();
+            if (timeout) {
+                cancelAnimationFrame(timeout);
+            }
+        }
+        const timeoutID = requestAnimationFrame((): void => {
+            const { width, height } = element.getBoundingClientRect();
+            const padding = getPaddings(element);
+            const margins = getMargins(element);
+
+            this.resize(width - padding.x - margins.x, height - padding.y - margins.y);
+        });
+
+        this.resizeTimeouts.push(timeoutID);
     }
 
     /**
@@ -330,35 +576,66 @@ abstract class Component<TEventObject extends Component.Event = Component.Event>
         return this;
     }
 
+    public setTitle(titleOptions: Component.textOptionsType): void {
+        const titleElement = Component.createTextElement('h1', 'title', titleOptions);
+        if (titleElement) {
+            this.titleElement = titleElement;
+        }
+    }
+
+    public setCaption(captionOptions: Component.textOptionsType): void {
+        const captionElement = Component.createTextElement('div', 'caption', captionOptions);
+        if (captionElement) {
+            this.captionElement = captionElement;
+        }
+    }
+
     /**
      * Handles setting things up on initial render
      *
      * @return {this}
      */
     public load(): this {
+
         // Set up the store on inital load if it has not been done
         if (!this.hasLoaded && this.store) {
             this.setStore(this.store);
         }
 
-        /* this.parentElement.appendChild(this.element); */
-
+        this.setTitle(this.options.title);
+        this.setCaption(this.options.caption);
+        [this.titleElement, this.contentElement, this.captionElement].forEach((element): void => {
+            if (element) {
+                this.element.appendChild(element);
+            }
+        });
         // Setup event listeners
         // Grabbed from Chart.ts
         const events = this.options.events;
         if (events) {
+            Object.keys(events).forEach((key): void => {
+                const eventCallback = (events as any)[key];
+                if (eventCallback) {
+                    this.callbackRegistry.addCallback(key, {
+                        type: 'component',
+                        func: eventCallback
+                    });
+                }
+            });
             objectEach(events, (eventCallback, eventType): void => {
                 if (isFunction(eventCallback)) {
-                    this.on(eventType, eventCallback as any);
+                    this.on(eventType as any, eventCallback as any);
                 }
             });
         }
 
-        this.on('message', (e: Component.MessageEvent): void => {
-            if (typeof e.message?.callback === 'function') {
-                e.message.callback.apply(this);
+        this.on('message', (e): void => {
+            if ('message' in e) {
+                this.onMessage(e.message);
             }
         });
+
+        window.addEventListener('resize', (): void => this.resizeTo(this.parentElement));
 
         this.hasLoaded = true;
 
@@ -373,19 +650,10 @@ abstract class Component<TEventObject extends Component.Event = Component.Event>
     public render(): this {
         if (!this.hasLoaded) {
             this.load();
-            // Call resize to set the sizes
-            this.resize(
-                this.options.dimensions?.width,
-                this.options.dimensions?.height
-            );
+            // Call resize to fit to the cell
+            this.resizeTo(this.parentElement);
         }
-
-        const e = {
-            component: this
-        };
-        fireEvent(this, 'render', e);
-
-        return e.component;
+        return this;
     }
 
     /**
@@ -416,19 +684,40 @@ abstract class Component<TEventObject extends Component.Event = Component.Event>
 
     public on(
         type: TEventObject['type'],
-        callback: DataEventEmitter.EventCallback<this, TEventObject>
+        callback: DataEventEmitter.EventCallback<this, TEventObject | Component.EventTypes>
     ): Function {
         return addEvent(this, type, callback);
     }
 
     public emit(
-        e: TEventObject
+        e: Component.EventTypes
     ): void {
+        if (!e.target) {
+            e.target = this;
+        }
         fireEvent(this, e.type, e);
     }
 
-    public postMessage(message: any, target?: string): void {
-        Component.relayMessage(this, message, target);
+    public postMessage(
+        message: Component.MessageType,
+        target: Component.MessageTarget = { type: 'componentType', target: 'all' }
+    ): void {
+        const component = Component.getInstanceById(this.id);
+
+        if (component) {
+            Component.relayMessage(component, message, target);
+        }
+    }
+
+    public onMessage(message: Component.MessageType): void {
+        if (message && typeof message === 'string') {
+            // do something
+            return;
+        }
+
+        if (typeof message === 'object' && typeof message.callback === 'function') {
+            message.callback.apply(this);
+        }
     }
 
     /**
@@ -448,9 +737,10 @@ abstract class Component<TEventObject extends Component.Event = Component.Event>
             }
             dimensions[key] = value;
         });
-        return {
+
+        const json = {
             $class: Component.getName(this.constructor),
-            store: this.store?.toJSON(),
+            store: this.store ? this.store.toJSON() : void 0,
             options: {
                 parentElement: this.parentElement.id,
                 dimensions,
@@ -458,6 +748,8 @@ abstract class Component<TEventObject extends Component.Event = Component.Event>
                 id: this.options.id || this.id
             }
         };
+
+        return json;
     }
 }
 
@@ -468,53 +760,71 @@ namespace Component {
         options: ComponentJSONOptions;
     }
 
-    export type eventTypes =
-        'render' | 'afterRender' |
-        'redraw' | 'afterRedraw' |
-        'load' | 'afterLoad' |
-        'update' | 'afterUpdate' |
-        'message' | 'tableChanged' |
-        'resize' | 'storeAttached';
-    type ComponentEventTypes = ResizeEvent | MessageEvent | UpdateEvent | TableChangedEvent | Event;
-    export interface ResizeEvent extends Event {
+    /**
+     * The basic events
+     */
+    export type EventTypes =
+        ResizeEvent |
+        UpdateEvent |
+        TableChangedEvent |
+        LoadEvent |
+        RenderEvent |
+        RedrawEvent |
+        JSONEvent |
+        MessageEvent |
+        PresentationModifierEvent;
+
+    export type ResizeEvent = Event<'resize', {
+        readonly type: 'resize';
         width?: number;
         height?: number;
-    }
+    }>;
 
-    export interface MessageEvent extends Event {
-        message?: Partial<{
-            callback: Function;
-        }>;
-    }
-
-    export interface UpdateEvent extends Event {
+    export type UpdateEvent = Event<'update' | 'afterUpdate', {
         options?: ComponentOptions;
-    }
+    }>;
 
-    export interface TableChangedEvent extends Event {
-        options?: ComponentOptions;
-    }
-    /**
-     * The default event object for a component
-     */
-    export interface Event extends DataEventEmitter.EventObject {
-        readonly type: eventTypes;
-        component?: Component<any>;
-    }
+    export type LoadEvent = Event<'load' | 'afterLoad', {}>;
+    export type RedrawEvent = Event<'redraw' | 'afterRedraw', {}>;
+    export type RenderEvent = Event<'beforeRender' | 'afterRender', {}>;
+    export type MessageEvent = Event<'message', {
+        message: MessageType;
+        detail?: {
+            sender: string;
+            target: string;
+        };
+    }>;
+    export type JSONEvent = Event<'toJSON' | 'fromJSOM', {
+        json: DataJSON.ClassJSON;
+    }>;
+    export type TableChangedEvent = Event<'tableChanged', {}>
+    export type PresentationModifierEvent = Component.Event<'afterPresentationModifier', {}>
+
+    export type Event<
+        EventType extends DataEventEmitter.Event['type'],
+        EventRecord extends Record<string, any>> = {
+            readonly type: EventType;
+            target?: Component;
+            detail?: DataEventEmitter.EventDetail;
+        } & EventRecord;
 
     export interface ComponentOptions extends EditableOptions {
+        parentCell?: Cell;
         parentElement: HTMLElement | string;
         className?: string;
         type: string;
         // allow overwriting gui elements
         navigationBindings?: Highcharts.NavigationBindingsOptionsObject[];
-        events?: Record<Event['type'], Function>;
+        events?: Record<string, Function>;
         editableOptions: Array<keyof EditableOptions>;
+        editableOptionsBindings?: EditableOptions.BindingsType;
+        presentationModifier?: DataModifier;
     }
 
+    export type StoreTypes = DataStore<DataStore.Event>
+
     export interface EditableOptions {
-        dimensions?: { width?: number | string; height?: number | string };
-        store?: DataStore<any>;
+        store?: StoreTypes;
         id?: string;
         style?: CSSObject;
         title: textOptionsType;
@@ -533,5 +843,14 @@ namespace Component {
         type: string;
         id: string;
     }
+    export interface MessageTarget {
+        type: 'group' | 'componentType' | 'componentID';
+        target: ComponentType['id'] | ComponentType['type'] | ComponentGroup['id'];
+    }
+
+    export type MessageType = string | {
+        callback: Function;
+    }
+
 }
 export default Component;

@@ -18,8 +18,13 @@ body {
     margin: 0.5em;
 }
 
-.hcd-component-kpi-title {
-    padding-top: 0.5em;
+.hcd-component-kpi-content {
+    display: flex;
+    flex-direction: column;
+}
+
+.hcd-component-title {
+    margin-bottom: 0;
 }
 
 .hcd-component-kpi-value-wrap {

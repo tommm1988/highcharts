@@ -10,15 +10,24 @@
 
 'use strict';
 
+/* *
+ *
+ *  Imports
+ *
+ * */
+
 import type AnimationOptions from '../Animation/AnimationOptions';
-import type { AxisLike } from './Types';
+import type AxisLike from './AxisLike';
+import type AxisOptions from './AxisOptions';
 import type ColorString from '../Color/ColorString';
 import type ColorType from '../Color/ColorType';
 import type GradientColor from '../Color/GradientColor';
+import type LegendOptions from '../LegendOptions';
 import type PointerEvent from '../PointerEvent';
 import type { StatesOptionsKey } from '../Series/StatesOptions';
 import type SVGElement from '../Renderer/SVG/SVGElement';
 import type SVGPath from '../Renderer/SVG/SVGPath';
+
 import Axis from './Axis.js';
 import Chart from '../Chart/Chart.js';
 import Color from '../Color/Color.js';
@@ -51,9 +60,31 @@ const {
     splat
 } = U;
 
+/* *
+ *
+ *  Declarations
+ *
+ * */
+
+declare module '../Axis/AxisLike' {
+    interface AxisLike {
+        labelLeft?: number;
+        labelRight?: number;
+    }
+}
+
 declare module '../Chart/ChartLike' {
     interface ChartLike {
         colorAxis?: Array<ColorAxis>;
+    }
+}
+
+declare module '../../Core/Options'{
+    interface Options {
+        colorAxis?: (
+            DeepPartial<ColorAxis.Options>|
+            Array<DeepPartial<ColorAxis.Options>>
+        );
     }
 }
 
@@ -85,16 +116,6 @@ declare module '../Series/SeriesOptions' {
  */
 declare global {
     namespace Highcharts {
-        interface Axis {
-            labelLeft?: number;
-            labelRight?: number;
-        }
-        interface Options {
-            colorAxis?: (
-                DeepPartial<ColorAxis.Options>|
-                Array<DeepPartial<ColorAxis.Options>>
-            );
-        }
         let ColorAxis: ColorAxisClass;
     }
 }
@@ -704,7 +725,7 @@ class ColorAxis extends Axis implements AxisLike {
      */
     public initDataClasses(userOptions: DeepPartial<ColorAxis.Options>): void {
         const axis = this;
-        var chart = axis.chart,
+        let chart = axis.chart,
             dataClasses,
             colorCounter = 0,
             colorCount = chart.options.chart.colorCount,
@@ -718,7 +739,7 @@ class ColorAxis extends Axis implements AxisLike {
             dataClass: ColorAxis.DataClassesOptions,
             i: number
         ): void {
-            var colors: any;
+            let colors: any;
 
             dataClass = merge(dataClass);
             dataClasses.push(dataClass);
@@ -1182,7 +1203,7 @@ class ColorAxis extends Axis implements AxisLike {
     /**
      * @private
      */
-    public getPlotLinePath(options: Highcharts.AxisPlotLinePathOptionsObject): (SVGPath|null) {
+    public getPlotLinePath(options: Axis.PlotLinePathOptions): (SVGPath|null) {
         const axis = this,
             left = axis.left,
             pos = options.translatedValue,
@@ -1309,7 +1330,7 @@ class ColorAxis extends Axis implements AxisLike {
                 dataClass: ColorAxis.DataClassesOptions,
                 i: number
             ): void {
-                var vis = true,
+                let vis = true,
                     from = dataClass.from,
                     to = dataClass.to;
                 const { numberFormatter } = chart;
@@ -1396,7 +1417,7 @@ H.ColorAxis = ColorAxis as any;
 
 // Extend the chart getAxes method to also get the color axis
 addEvent(Chart, 'afterGetAxes', function (): void {
-    var chart = this,
+    const chart = this,
         options = chart.options;
 
     this.colorAxis = [];
@@ -1413,7 +1434,7 @@ addEvent(Chart, 'afterGetAxes', function (): void {
 
 // Add colorAxis to series axisTypes
 addEvent(Series, 'bindAxes', function (): void {
-    var axisTypes = this.axisTypes;
+    const axisTypes = this.axisTypes;
 
     if (!axisTypes) {
         this.axisTypes = ['colorAxis'];
@@ -1429,13 +1450,22 @@ addEvent(Series, 'bindAxes', function (): void {
 addEvent(Legend, 'afterGetAllItems', function (
     this: Highcharts.Legend,
     e: {
-        allItems: Array<(ColorAxis|ColorAxis.LegendItemObject)>;
+        allItems: Array<(Series|Point|ColorAxis|ColorAxis.LegendItemObject)>;
     }
 ): void {
-    var colorAxisItems = [] as Array<(ColorAxis|ColorAxis.LegendItemObject)>,
+    let colorAxisItems = [] as Array<(ColorAxis|ColorAxis.LegendItemObject)>,
         colorAxes = this.chart.colorAxis || [],
         options: ColorAxis.Options,
         i;
+
+    const destroyItem = (item: (Series|Point)): void => {
+        const i = e.allItems.indexOf(item);
+        if (i !== -1) {
+            // #15436
+            this.destroyItem(e.allItems[i]);
+            e.allItems.splice(i, 1);
+        }
+    };
 
     colorAxes.forEach(function (colorAxis: ColorAxis): void {
         options = colorAxis.options;
@@ -1459,11 +1489,11 @@ addEvent(Legend, 'afterGetAllItems', function (
                         series.points.forEach(function (
                             point: Point
                         ): void {
-                            erase(e.allItems, point);
+                            destroyItem(point);
                         });
 
                     } else {
-                        erase(e.allItems, series);
+                        destroyItem(series);
                     }
                 }
             });
@@ -1492,7 +1522,7 @@ addEvent(Legend, 'afterColorizeItem', function (
 
 // Updates in the legend need to be reflected in the color axis (6888)
 addEvent(Legend, 'afterUpdate', function (this: Highcharts.Legend): void {
-    var colorAxes = this.chart.colorAxis;
+    const colorAxes = this.chart.colorAxis;
 
     if (colorAxes) {
         colorAxes.forEach(function (colorAxis): void {
@@ -1541,11 +1571,11 @@ namespace ColorAxis {
         width?: number;
     }
 
-    export interface Options extends Highcharts.XAxisOptions {
+    export interface Options extends AxisOptions {
         dataClassColor?: string;
         dataClasses?: Array<DataClassesOptions>;
         layout?: string;
-        legend?: Highcharts.LegendOptions;
+        legend?: LegendOptions;
         marker?: MarkerOptions;
         maxColor?: ColorType;
         minColor?: ColorType;

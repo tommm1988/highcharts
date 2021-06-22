@@ -1,18 +1,22 @@
 import type CSSObject from '../../Core/Renderer/CSSObject';
+import type Options from '../../Core/Options.js';
+import AST from '../../Core/Renderer/HTML/AST.js';
 import Chart from '../../Core/Chart/Chart.js';
 import Component from './Component.js';
-import H from '../../Core/Globals.js';
+import F from '../../Core/FormatUtilities.js';
+const {
+    format
+} = F;
+import Highcharts from '../../masters/highcharts.src.js';
 import U from '../../Core/Utilities.js';
 const {
     createElement,
     css,
     defined,
-    format,
     isArray,
     isNumber,
     merge
 } = U;
-import AST from '../../Core/Renderer/HTML/AST.js';
 
 class KPIComponent extends Component {
     public static defaultOptions: KPIComponent.ComponentOptions = merge(
@@ -22,21 +26,15 @@ class KPIComponent extends Component {
                 Component.defaultOptions.className,
                 `${Component.defaultOptions.className}-kpi`
             ].join(' '),
-            dimensions: {
-                width: 250,
-                height: 150
-            },
             style: {
                 boxSizing: 'border-box',
-                display: 'flex',
-                flexDirection: 'column',
                 textAlign: 'center'
             },
             thresholdColors: ['#f45b5b', '#90ed7d']
         }
     );
 
-    public static defaultChartOptions: Highcharts.Options = {
+    public static defaultChartOptions: Options = {
         chart: {
             type: 'spline',
             backgroundColor: 'transparent'
@@ -73,7 +71,6 @@ class KPIComponent extends Component {
 
     public options: KPIComponent.ComponentOptions;
 
-    public title: HTMLElement;
     public valueWrap: HTMLElement;
     public value: HTMLElement;
     public subtitle: HTMLElement;
@@ -93,9 +90,6 @@ class KPIComponent extends Component {
 
         this.type = 'KPI';
 
-        this.title = createElement('div', {
-            className: `${Component.defaultOptions.className}-kpi-title`
-        });
         this.valueWrap = createElement('div', {
             className: `${Component.defaultOptions.className}-kpi-value-wrap`
         });
@@ -113,11 +107,10 @@ class KPIComponent extends Component {
     public load(): this {
         super.load();
 
-        this.element.appendChild(this.title);
-        this.element.appendChild(this.valueWrap);
+        this.contentElement.appendChild(this.valueWrap);
         this.valueWrap.appendChild(this.value);
         this.valueWrap.appendChild(this.subtitle);
-        this.element.appendChild(this.chartContainer);
+        this.contentElement.appendChild(this.chartContainer);
         this.parentElement.appendChild(this.element);
 
         this.updateElements();
@@ -126,23 +119,23 @@ class KPIComponent extends Component {
             this.updateSize(this.dimensions.width, this.dimensions.height);
         }
 
-        return this;
-    }
+        this.on('resize', () => {
+            if (this.dimensions.width && this.dimensions.height) {
+                this.updateSize(this.dimensions.width, this.dimensions.height);
+            }
 
-    public resize(width: number, height: number): this {
-        super.resize(width, height);
-
-        this.updateSize(width, height);
-
-        if (this.chart) {
-            this.chart.reflow();
-        }
+            if (this.chart) {
+                this.chart.reflow();
+            }
+        })
 
         return this;
     }
 
     private updateSize(width: number, height: number): void {
-        this.title.style.fontSize = 0.1 * Math.min(width, height) + 'px';
+        if (this.titleElement) {
+            this.titleElement.style.fontSize = 0.1 * Math.min(width, height) + 'px';
+        }
         this.value.style.fontSize = 0.2 * Math.min(width, height) + 'px';
         this.subtitle.style.fontSize = 0.08 * Math.min(width, height) + 'px';
     }
@@ -151,7 +144,7 @@ class KPIComponent extends Component {
         super.render();
 
         if (this.options.chart && !this.chart) {
-            this.chart = H.chart(this.chartContainer, merge(
+            this.chart = Highcharts.chart(this.chartContainer, merge(
                 KPIComponent.defaultChartOptions,
                 this.options.chart
             ));
@@ -180,21 +173,11 @@ class KPIComponent extends Component {
     private updateElements(): void {
         const {
             style,
-            title,
             valueFormat,
             valueFormatter
         } = this.options;
 
         let value = this.options.value;
-
-        if (typeof title === 'object') {
-            AST.setElementHTML(this.title, title.text || '');
-            if (title.style) {
-                css(this.title, title.style);
-            }
-        } else {
-            AST.setElementHTML(this.title, title || '');
-        }
 
         if (defined(value)) {
             let prevValue;
@@ -300,7 +283,7 @@ namespace KPIComponent {
     export type ComponentType = KPIComponent;
 
     export interface ComponentOptions extends Component.ComponentOptions {
-        chart?: Highcharts.Options;
+        chart?: Options;
         style?: CSSObject;
         threshold?: number|Array<number>;
         thresholdColors?: Array<string>;

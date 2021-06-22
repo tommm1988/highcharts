@@ -28,11 +28,23 @@ const {
     splat
 } = U;
 
+declare module '../Core/Axis/AxisLike' {
+    interface AxisLike {
+        pane?: Pane;
+    }
+}
+
 declare module '../Core/Chart/ChartLike'{
     interface ChartLike {
         pane?: Array<Highcharts.Pane>;
         hoverPane?: Highcharts.Pane;
         getHoverPane?(eventArgs: any): Highcharts.Pane|undefined;
+    }
+}
+
+declare module '../Core/Options'{
+    interface Options {
+        pane?: Highcharts.PaneOptions;
     }
 }
 
@@ -43,12 +55,6 @@ declare module '../Core/Chart/ChartLike'{
 declare global {
     namespace Highcharts {
         type PaneBackgroundShapeValue = ('arc'|'circle'|'solid');
-        interface Axis {
-            pane?: Pane;
-        }
-        interface Options {
-            pane?: PaneOptions;
-        }
         interface PaneBackgroundOptions {
             backgroundColor?: ColorType;
             borderColor?: ColorType;
@@ -80,7 +86,7 @@ declare global {
             public center: Array<number>;
             public chart: PaneChart;
             public coll: 'pane';
-            public defaultBackgroundOptions?: PaneBackgroundOptions;
+            public defaultBackgroundOptions: PaneBackgroundOptions;
             public defaultOptions: PaneOptions;
             public group?: SVGElement;
             public options: PaneOptions;
@@ -110,7 +116,7 @@ Chart.prototype.collectionsWithUpdate.push('pane');
 /**
  * The Pane object allows options that are common to a set of X and Y axes.
  *
- * In the future, this can be extended to basic Highcharts and Highstock.
+ * In the future, this can be extended to basic Highcharts and Highcharts Stock.
  *
  * @private
  * @class
@@ -180,7 +186,7 @@ class Pane {
      * @function Highcharts.Pane#render
      */
     public render(): void {
-        var options = this.options,
+        let options = this.options,
             backgroundOption = this.options.background,
             renderer = this.chart.renderer,
             len,
@@ -238,7 +244,7 @@ class Pane {
         backgroundOptions: Highcharts.PaneBackgroundOptions,
         i: number
     ): void {
-        var method = 'animate',
+        let method = 'animate',
             attribs: SVGAttributes = {
                 'class':
                     'highcharts-pane ' + (backgroundOptions.className || '')
@@ -503,7 +509,7 @@ class Pane {
 
         this.setOptions(this.options);
         this.render();
-        this.chart.axes.forEach(function (axis: Highcharts.Axis): void {
+        this.chart.axes.forEach(function (axis): void {
             if (axis.pane === this) {
                 axis.pane = null as any;
                 axis.update({}, redraw);
@@ -598,7 +604,7 @@ addEvent(Pointer, 'beforeGetHoverData', function (
 });
 
 addEvent(Pointer, 'afterGetHoverData', function (
-    eventArgs: Highcharts.PointerEventArgsObject
+    eventArgs: Pointer.EventArgsObject
 ): void {
     const chart = this.chart;
     if (

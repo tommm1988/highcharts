@@ -1,6 +1,7 @@
+/* eslint-disable */
+import type ComponentTypes from '../Component/ComponentType';
 import ChartComponent from './../Component/ChartComponent.js';
 import HTMLComponent from './../Component/HTMLComponent.js';
-import GroupComponent from './../Component/GroupComponent.js';
 
 import type {
     HTMLDOMElement
@@ -57,11 +58,11 @@ class Bindings {
 
     public static addComponent(
         options: Bindings.ComponentOptions
-    ): HTMLComponent|ChartComponent|GroupComponent|undefined {
+    ): ComponentTypes | undefined {
         const compontentContainer = document.getElementById(options.cell);
         const events = options.events;
 
-        let component: HTMLComponent|ChartComponent|GroupComponent|undefined;
+        let component: ComponentTypes|undefined;
 
         // add elements to containers
         if (compontentContainer) {
@@ -93,20 +94,12 @@ class Bindings {
             // update cell size (when component is wider, cell should adjust)
             // this.updateSize();
             if (options && options.dimensions) {
-                Cell.setSize(options.dimensions, compontentContainer);
+                Cell.setContainerSize(options.dimensions, compontentContainer);
             }
         }
 
         // add events
-        if (component && events) {
-            objectEach(events, (fn, key): void => {
-                addEvent(
-                    component,
-                    key,
-                    fn
-                );
-            });
-
+        if (component) {
             fireEvent(component, 'mount');
         }
 
@@ -116,10 +109,10 @@ class Bindings {
     public static componentFromJSON(
         json: HTMLComponent.ClassJSON|ChartComponent.ClassJSON,
         cellContainer: HTMLDOMElement|undefined
-    ): HTMLComponent|ChartComponent|GroupComponent|undefined {
+    ): ComponentTypes | undefined {
 
         const compontentContainer = cellContainer;
-        let component: HTMLComponent|ChartComponent|GroupComponent|undefined;
+        let component: HTMLComponent|ChartComponent|undefined;
 
         switch (json.$class) {
             case 'Chart':
@@ -138,7 +131,7 @@ class Bindings {
         // update cell size (when component is wider, cell should adjust)
         // this.updateSize();
         if (json.options.dimensions && cellContainer) {
-            Cell.setSize(json.options.dimensions, cellContainer);
+            Cell.setContainerSize(json.options.dimensions, cellContainer);
         }
 
         // TODO - events
@@ -190,35 +183,6 @@ class Bindings {
                 })
         );
     }
-
-    public static groupComponent(
-        compontentContainer: HTMLDOMElement
-    ): GroupComponent {
-        return new GroupComponent({
-            parentElement: compontentContainer,
-            direction: 'column',
-            components: [
-                new HTMLComponent({
-                    elements: [{
-                        tagName: 'img',
-                        attributes: {
-                            src: 'https://i.ytimg.com/vi/qlO4M6MfDFY/hqdefault.jpg',
-                            title: 'I heard you like components'
-                        }
-                    }]
-                }),
-                new ChartComponent({
-                    chartOptions: {
-                        chart: {},
-                        series: [{
-                            type: 'pie',
-                            data: [1, 2, 3]
-                        }]
-                    }
-                })
-            ]
-        });
-    }
 }
 
 namespace Bindings {
@@ -237,7 +201,7 @@ namespace Bindings {
     }
     export interface MountedComponentsOptions {
         options: any;
-        component: ChartComponent|HTMLComponent|GroupComponent|undefined;
+        component: ChartComponent|HTMLComponent|undefined;
         cell: Cell;
     }
 }

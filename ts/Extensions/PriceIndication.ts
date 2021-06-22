@@ -10,6 +10,7 @@
 
 'use strict';
 
+import type { AxisCrosshairOptions } from '../Core/Axis/AxisOptions';
 import type SVGElement from '../Core/Renderer/SVG/SVGElement';
 import Series from '../Core/Series/Series.js';
 import U from '../Core/Utilities.js';
@@ -37,7 +38,7 @@ declare module '../Core/Series/SeriesOptions' {
 
 declare global {
     namespace Highcharts {
-        interface LastPriceOptions extends XAxisCrosshairOptions {
+        interface LastPriceOptions extends AxisCrosshairOptions {
             enabled?: boolean;
         }
         interface LastVisiblePriceOptions {
@@ -74,17 +75,104 @@ declare global {
 
 /**
  * @declare   Highcharts.SeriesLastVisiblePriceLabelOptionsObject
+ * @extends   yAxis.crosshair.label
+ * @since     7.0.0
  * @apioption plotOptions.series.lastVisiblePrice.label
  */
 
 /**
- * Enable or disable the label.
+ * @since     7.0.0
+ * @apioption plotOptions.series.lastVisiblePrice.label.align
+ */
+
+/**
+ * @since     7.0.0
+ * @apioption plotOptions.series.lastVisiblePrice.label.backgroundColor
+ */
+
+/**
+ * The border color for the `lastVisiblePrice` label.
+ *
+ * @type      {Highcharts.ColorType}
+ * @since     7.0.0
+ * @product   highstock
+ * @apioption plotOptions.series.lastVisiblePrice.label.borderColor
+ */
+
+/**
+ * The border corner radius of the `lastVisiblePrice` label.
+ *
+ * @type      {number}
+ * @default   3
+ * @since     7.0.0
+ * @product   highstock
+ * @apioption plotOptions.series.lastVisiblePrice.label.borderRadius
+*/
+
+/**
+ * Flag to enable `lastVisiblePrice` label.
+ *
  *
  * @type      {boolean}
- * @product   highstock
  * @default   false
+ * @since     7.0
+ * @product   highstock
  * @apioption plotOptions.series.lastVisiblePrice.label.enabled
+ */
+
+/**
+ * A format string for the `lastVisiblePrice` label. Defaults to `{value}` for
+ * numeric axes and `{value:%b %d, %Y}` for datetime axes.
  *
+ * @type      {string}
+ * @since     7.0
+ * @product   highstock
+ * @apioption plotOptions.series.lastVisiblePrice.label.format
+*/
+
+/**
+ * @since     7.0.0
+ * @apioption plotOptions.series.lastVisiblePrice.label.formatter
+ */
+
+/**
+ * @since     7.0.0
+ * @apioption plotOptions.series.lastVisiblePrice.label.padding
+ */
+
+/**
+ * @since     7.0.0
+ * @apioption plotOptions.series.lastVisiblePrice.label.shape
+ */
+
+/**
+ * Text styles for the `lastVisiblePrice` label.
+ *
+ * @type      {Highcharts.CSSObject}
+ * @default   {"color": "white", "fontWeight": "normal", "fontSize": "11px", "textAlign": "center"}
+ * @since     7.0
+ * @product   highstock
+ * @apioption plotOptions.series.lastVisiblePrice.label.style
+ */
+
+/**
+ * The border width for the `lastVisiblePrice` label.
+ *
+ * @type      {number}
+ * @default   0
+ * @since     7.0
+ * @product   highstock
+ * @apioption plotOptions.series.lastVisiblePrice.label.borderWidth
+*/
+
+/**
+ * Padding inside the `lastVisiblePrice` label.
+ *
+ * @type      {number}
+ * @default   8
+ * @since     7.0
+ * @product   highstock
+ * @apioption plotOptions.series.lastVisiblePrice.label.padding
  */
 
 /**
@@ -109,6 +197,102 @@ declare global {
  */
 
 /**
+ * @declare   Highcharts.SeriesLastPriceLabelOptionsObject
+ * @extends   yAxis.crosshair.label
+ * @since     7.0.0
+ * @apioption plotOptions.series.lastPrice.label
+ */
+
+/**
+ * @since     7.0.0
+ * @apioption plotOptions.series.lastPrice.label.align
+ * */
+
+/**
+ * @since     7.0.0
+ * @apioption plotOptions.series.lastPrice.label.backgroundColor
+ * */
+
+/**
+ * The border color of `lastPrice` label.
+ * @since     7.0.0
+ * @apioption plotOptions.series.lastPrice.label.borderColor
+ * */
+
+/**
+ * The border radius of `lastPrice` label.
+ * @since     7.0.0
+ * @apioption plotOptions.series.lastPrice.label.borderRadius
+ * */
+
+/**
+ * The border width of `lastPrice` label.
+ * @since     7.0.0
+ * @apioption plotOptions.series.lastPrice.label.borderWidth
+ * */
+
+/**
+ * Flag to enable `lastPrice` label.
+ * @since     7.0.0
+ * @apioption plotOptions.series.lastPrice.label.enabled
+ * */
+
+/**
+ * A format string for the `lastPrice` label. Defaults to `{value}` for
+ * numeric axes and `{value:%b %d, %Y}` for datetime axes.
+ *
+ * @type      {string}
+ * @since     7.0
+ * @product   highstock
+ * @apioption plotOptions.series.lastPrice.label.format
+*/
+
+/**
+ * @since     7.0.0
+ * @apioption plotOptions.series.lastPrice.label.formatter
+ */
+
+/**
+ * @since     7.0.0
+ * @apioption plotOptions.series.lastPrice.label.padding
+ */
+
+/**
+ * @since     7.0.0
+ * @apioption plotOptions.series.lastPrice.label.shape
+ */
+
+/**
+ * Text styles for the `lastPrice` label.
+ *
+ * @type      {Highcharts.CSSObject}
+ * @default   {"color": "white", "fontWeight": "normal", "fontSize": "11px", "textAlign": "center"}
+ * @since     7.0
+ * @product   highstock
+ * @apioption plotOptions.series.lastPrice.label.style
+ */
+
+/**
+ * The border width for the `lastPrice` label.
+ *
+ * @type      {number}
+ * @default   0
+ * @since     7.0
+ * @product   highstock
+ * @apioption plotOptions.series.lastPrice.label.borderWidth
+*/
+
+/**
+ * Padding inside the `lastPrice` label.
+ *
+ * @type      {number}
+ * @default   8
+ * @since     7.0
+ * @product   highstock
+ * @apioption plotOptions.series.lastPrice.label.padding
+ */
+
+/**
  * The color of the line of last price.
  * By default, the line has the same color as the series.
  *
@@ -121,7 +305,7 @@ declare global {
 /* eslint-disable no-invalid-this */
 
 addEvent(Series, 'afterRender', function (): void {
-    var series = this,
+    const series = this,
         seriesOptions = series.options,
         pointRange = seriesOptions.pointRange,
         lastVisiblePrice = seriesOptions.lastVisiblePrice,
@@ -131,7 +315,7 @@ addEvent(Series, 'afterRender', function (): void {
         (lastVisiblePrice || lastPrice) &&
          seriesOptions.id !== 'highcharts-navigator-series'
     ) {
-        var xAxis = series.xAxis,
+        let xAxis = series.xAxis,
             yAxis = series.yAxis,
             origOptions = yAxis.crosshair,
             origGraphic = yAxis.cross,
@@ -170,6 +354,7 @@ addEvent(Series, 'afterRender', function (): void {
             // Save price
             if (series.yAxis.cross) {
                 series.lastPrice = series.yAxis.cross;
+                series.lastPrice.addClass('highcharts-color-' + series.colorIndex); // #15222
                 series.lastPrice.y = yValue;
             }
         }
@@ -209,7 +394,6 @@ addEvent(Series, 'afterRender', function (): void {
         yAxis.crosshair = yAxis.options.crosshair = origOptions;
         yAxis.cross = origGraphic;
         yAxis.crossLabel = origLabel;
-
     }
 });
 

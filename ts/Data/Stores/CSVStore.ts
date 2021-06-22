@@ -10,29 +10,42 @@
  *
  * */
 
+'use strict';
+
+/* *
+ *
+ *  Imports
+ *
+ * */
+
 import type DataEventEmitter from '../DataEventEmitter';
 
 import Ajax from '../../Extensions/Ajax.js';
 import CSVParser from '../Parsers/CSVParser.js';
 import DataJSON from '../DataJSON.js';
-const {
-    ajax
-} = Ajax;
+const { ajax } = Ajax;
 import DataStore from './DataStore.js';
 import DataTable from '../DataTable.js';
 import U from '../../Core/Utilities.js';
 const {
     merge,
-    pick,
     objectEach
 } = U;
+
+/* *
+ *
+ *  Class
+ *
+ * */
 
 /* eslint-disable no-invalid-this, require-jsdoc, valid-jsdoc */
 
 /**
  * Class that handles creating a datastore from CSV
+ *
+ * @private
  */
-class CSVStore extends DataStore<CSVStore.EventObjects> implements DataJSON.Class {
+class CSVStore extends DataStore<CSVStore.Event> implements DataJSON.Class {
 
     /* *
      *
@@ -180,7 +193,7 @@ class CSVStore extends DataStore<CSVStore.EventObjects> implements DataJSON.Clas
         let currentRetries: number;
 
         // Clear the table
-        store.table.clear();
+        store.table.deleteColumns();
         if (initialFetch) {
             clearTimeout(store.liveDataTimeout);
             store.liveDataURL = csvURL;
@@ -193,16 +206,21 @@ class CSVStore extends DataStore<CSVStore.EventObjects> implements DataJSON.Clas
             dataType: 'text',
             success: function (csv: string): void {
                 store.parser.parse({ csv });
+
+                // On inital fetch we need to set the columns
+                store.table.setColumns(store.parser.getTable().getColumns());
+
                 if (store.liveDataURL) {
                     store.poll();
                 }
-                store.table.setRows(store.parser.getTable().getRows());
+
                 store.emit({
                     type: 'afterLoad',
                     csv,
                     detail: eventDetail,
                     table: store.table
                 });
+
             },
             error: function (xhr, error): void {
                 if (++currentRetries < maxRetries) {
@@ -239,7 +257,7 @@ class CSVStore extends DataStore<CSVStore.EventObjects> implements DataJSON.Clas
 
         if (csv) {
             // If already loaded, clear the current rows
-            table.clearRows();
+            table.deleteRows();
             store.emit({
                 type: 'load',
                 csv,
@@ -315,7 +333,7 @@ class CSVStore extends DataStore<CSVStore.EventObjects> implements DataJSON.Clas
             let columnDataType;
 
             if (columnMeta) {
-                columnDataType = columnMeta?.dataType;
+                columnDataType = columnMeta.dataType;
             }
 
             for (let rowIndex = 0; rowIndex < columnLength; rowIndex++) {
@@ -416,7 +434,7 @@ namespace CSVStore {
     /**
      * Event objects fired from CSVDataStore events
      */
-    export type EventObjects = (ErrorEventObject | LoadEventObject);
+    export type Event = (ErrorEvent | LoadEvent);
 
     /**
      * Options for the CSVDataStore class constructor
@@ -441,7 +459,7 @@ namespace CSVStore {
     /**
      * The event object that is provided on errors within CSVDataStore
      */
-    export interface ErrorEventObject extends DataStore.EventObject {
+    export interface ErrorEvent extends DataStore.Event {
         type: ('loadError');
         error: (string | Error);
         xhr?: XMLHttpRequest;
@@ -450,7 +468,7 @@ namespace CSVStore {
     /**
      * The event object that is provided on load events within CSVDataStore
      */
-    export interface LoadEventObject extends DataStore.EventObject {
+    export interface LoadEvent extends DataStore.Event {
         type: ('load' | 'afterLoad');
         csv?: string;
     }
