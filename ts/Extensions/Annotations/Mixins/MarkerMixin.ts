@@ -31,11 +31,7 @@ const {
  *  Declarations
  *
  * */
-declare module '../AnnotationChart'{
-    interface AnnotationChart {
-        afterGetContainer(): void;
-    }
-}
+
 declare module '../../../Core/Options'{
     interface Options {
         defs?: Record<string, AST.Node>;

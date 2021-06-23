@@ -6,7 +6,7 @@
 
 'use strict';
 
-import type AnnotationChart from '../AnnotationChart';
+import type AnnotationComposition from '../AnnotationComposition';
 import type AnnotationOptions from '../AnnotationOptions';
 import type ControllableCircle from '../Controllables/ControllableCircle';
 import type ControllableRect from '../Controllables/ControllableRect';
@@ -186,11 +186,14 @@ class BasicAnnotation extends Annotation {
 
     /* *
      *
-     *  Constructors
+     *  Constructor
      *
      * */
 
-    public constructor(chart: AnnotationChart, options: AnnotationOptions) {
+    public constructor(
+        chart: AnnotationComposition.Chart,
+        options: AnnotationOptions
+    ) {
         super(chart, options);
     }
 

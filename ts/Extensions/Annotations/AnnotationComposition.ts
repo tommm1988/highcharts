@@ -16,14 +16,18 @@
  *
  * */
 
+import type Annotation from './Annotation';
 import type { AnnotationOptions } from './AnnotationOptions';
+import type { AnnotationTypeRegistry } from './Types/AnnotationType';
 import type AST from '../../Core/Renderer/HTML/AST';
-import type Chart from '../../Core/Chart/Chart';
+import type CoreChart from '../../Core/Chart/Chart';
+import type GlobalOptions from '../../Core/Options';
 import type NavigationBindings from './NavigationBindings';
-import type Options from '../../Core/Options';
+import type Pointer from '../../Core/Pointer/Pointer';
+import type CorePoint from '../../Core/Series/Point';
+import type CoreSeries from '../../Core/Series/Series';
 import type SVGElement from '../../Core/Renderer/SVG/SVGElement';
 
-import Annotation from './Annotation.js';
 import U from '../../Core/Utilities.js';
 const {
     addEvent,
@@ -31,7 +35,8 @@ const {
     extend,
     find,
     fireEvent,
-    pick
+    pick,
+    wrap
 } = U;
 
 /* *
@@ -55,11 +60,64 @@ declare module '../../Core/Chart/ChartLike' {
 
 /* *
  *
- *  Class
+ *  Composition
  *
  * */
 
-class AnnotationChart {
+namespace AnnotationComposition {
+
+    /* *
+     *
+     *  Declarations
+     *
+     * */
+
+    export declare class Chart extends CoreChart implements ChartAdditions {
+        annotations: Array<Annotation>;
+        controlPointsGroup: SVGElement;
+        navigationBindings: NavigationBindings;
+        options: Options;
+        plotBoxClip: SVGElement;
+        series: Array<Series>;
+        addAnnotation: ChartAdditions['addAnnotation'];
+        drawAnnotations: ChartAdditions['drawAnnotations'];
+        initAnnotation: ChartAdditions['initAnnotation'];
+        removeAnnotation: ChartAdditions['removeAnnotation'];
+    }
+
+    export interface Options extends GlobalOptions {
+        annotations: Array<AnnotationOptions>;
+        defs: Record<string, AST.Node>;
+        navigation: Highcharts.NavigationOptions;
+    }
+
+
+    export interface Point extends CorePoint {
+        series: Series;
+    }
+
+    export interface Series extends CoreSeries {
+        chart: AnnotationComposition.Chart;
+        points: Array<Point>;
+    }
+
+    /* *
+     *
+     *  Constants
+     *
+     * */
+
+    const composedClasses: Array<(typeof CoreChart|typeof Pointer)> = [];
+
+    /* *
+     *
+     *  Variables
+     *
+     * */
+
+    let annotationClass: typeof Annotation;
+
+    let types: AnnotationTypeRegistry;
 
     /* *
      *
@@ -67,11 +125,15 @@ class AnnotationChart {
      *
      * */
 
-    private static chartCallback(
-        this: Chart,
-        chart: AnnotationChart
+    /**
+     * @private
+     */
+    function chartCallback(
+        this: CoreChart
     ): void {
-        chart.plotBoxClip = this.renderer.clipRect(this.plotBox);
+        const chart = this as Chart;
+
+        chart.plotBoxClip = chart.renderer.clipRect(chart.plotBox);
 
         chart.controlPointsGroup = chart.renderer
             .g('control-points')
@@ -81,7 +143,7 @@ class AnnotationChart {
 
         chart.options.annotations.forEach(function (annotationOptions, i): void {
             if (
-                // Verify that it has not been previously added in a responsive
+                // Verify, that it has not been previously added in a responsiv
                 // rule
                 !chart.annotations.some((annotation): boolean =>
                     annotation.options === annotationOptions
@@ -248,173 +310,180 @@ class AnnotationChart {
         });
     }
 
-    public static compose<T extends typeof Chart>(
-        ChartClass: T
-    ): (T&typeof AnnotationChart) {
-        const chartProto = ChartClass.prototype as AnnotationChart;
+    /**
+     * @private
+     */
+    export function compose<T extends typeof CoreChart>(
+        AnnotationClass: typeof Annotation,
+        ChartClass: T,
+        PointerClass: typeof Pointer
+    ): (T&typeof Chart) {
 
-        extend(chartProto, AnnotationChart.prototype);
+        if (!annotationClass) {
+            annotationClass = AnnotationClass;
+            types = AnnotationClass.types;
+        }
 
-        // Let chart.update() update annotations
-        chartProto.collectionsWithUpdate.push('annotations');
+        if (composedClasses.indexOf(ChartClass) === -1) {
+            composedClasses.push(ChartClass);
 
-        // Let chart.update() create annoations on demand
-        chartProto.collectionsWithInit.annotations = [chartProto.addAnnotation];
+            const chartProto = ChartClass.prototype as Chart;
 
-        // Create lookups initially
-        addEvent(
-            ChartClass,
-            'afterInit',
-            function (): void {
-                const chart = this as AnnotationChart;
+            chartProto.callbacks.push(chartCallback);
+            // Let chart.update() update annotations
+            chartProto.collectionsWithUpdate.push('annotations');
+            // Let chart.update() create annoations on demand
+            chartProto.collectionsWithInit.annotations = [
+                ChartAdditions.prototype.addAnnotation
+            ];
 
-                chart.annotations = [];
+            extend(chartProto, ChartAdditions.prototype);
+            addEvent(ChartClass, 'afterInit', onChartAfterInit);
+        }
 
-                if (!chart.options.annotations) {
-                    chart.options.annotations = [];
-                }
-            }
-        );
+        if (composedClasses.indexOf(PointerClass) === -1) {
+            composedClasses.push(PointerClass);
 
-        chartProto.callbacks.push(AnnotationChart.chartCallback as any);
+            wrap(PointerClass, 'onContainerMouseDown', wrapPointerOnContainerMouseDown);
+        }
 
-        return ChartClass as (T&typeof AnnotationChart);
+        return ChartClass as (T&typeof Chart);
     }
-
-    /* *
-     *
-     *  Constructor
-     *
-     * */
-
-    public constructor() {
-        throw new Error('Missing class composition from AnnotationChart.compose.');
-    }
-
-    /* *
-     *
-     *  Functions
-     *
-     * */
 
     /**
-     * Add an annotation to the chart after render time.
-     *
-     * @function Highcharts.Chart#addAnnotation
-     *
-     * @param  {Highcharts.AnnotationsOptions} options
-     * The annotation options for the new, detailed annotation.
-     *
-     * @param {boolean} [redraw=true]
-     * Whether to redraw or not.
-     *
-     * @return {Highcharts.Annotation}
-     * The newly generated annotation.
+     * Create lookups initially
      */
-    public addAnnotation(
-        this: AnnotationChart,
-        userOptions: AnnotationOptions,
-        redraw?: boolean
-    ): Annotation {
-        const annotation = this.initAnnotation(userOptions);
-        this.options.annotations.push(annotation.options);
+    function onChartAfterInit(
+        this: CoreChart
+    ): void {
+        const chart = this as Chart;
 
-        if (pick(redraw, true)) {
-            annotation.redraw();
-            annotation.graphic.attr({
-                opacity: 1
+        chart.annotations = [];
+
+        if (!chart.options.annotations) {
+            chart.options.annotations = [];
+        }
+    }
+
+    /**
+     * @private
+     */
+    function wrapPointerOnContainerMouseDown(
+        this: Pointer,
+        proceed: Function
+    ): void {
+        const pointer = this;
+        if (!pointer.chart.hasDraggedAnnotation) {
+            proceed.apply(pointer, Array.prototype.slice.call(arguments, 1));
+        }
+    }
+
+    /* *
+     *
+     *  Classes
+     *
+     * */
+
+    class ChartAdditions {
+
+        /* *
+        *
+        *  Functions
+        *
+        * */
+
+        /**
+         * Add an annotation to the chart after render time.
+         *
+         * @function Highcharts.Chart#addAnnotation
+         *
+         * @param  {Highcharts.AnnotationsOptions} options
+         * The annotation options for the new, detailed annotation.
+         *
+         * @param {boolean} [redraw=true]
+         * Whether to redraw or not.
+         *
+         * @return {Highcharts.Annotation}
+         * The newly generated annotation.
+         */
+        public addAnnotation(
+            this: Chart,
+            userOptions: AnnotationOptions,
+            redraw?: boolean
+        ): Annotation {
+            const chart = this,
+                annotation = chart.initAnnotation(userOptions);
+
+            chart.options.annotations.push(annotation.options);
+
+            if (pick(redraw, true)) {
+                annotation.redraw();
+                annotation.graphic.attr({
+                    opacity: 1
+                });
+            }
+            return annotation;
+        }
+
+        public drawAnnotations(
+            this: Chart
+        ): void {
+            const chart = this;
+
+            chart.plotBoxClip.attr(chart.plotBox);
+
+            chart.annotations.forEach(function (annotation): void {
+                annotation.redraw();
+                annotation.graphic.animate({
+                    opacity: 1
+                }, annotation.animationConfig);
             });
         }
-        return annotation;
-    }
 
-    public drawAnnotations(
-        this: AnnotationChart
-    ): void {
-        this.plotBoxClip.attr(this.plotBox);
+        public initAnnotation(
+            this: Chart,
+            userOptions: AnnotationOptions
+        ): Annotation {
+            const chart = this,
+                Constructor = (types[userOptions.type || ''] || annotationClass),
+                annotation = new Constructor(chart, userOptions);
 
-        this.annotations.forEach(function (annotation): void {
-            annotation.redraw();
-            annotation.graphic.animate({
-                opacity: 1
-            }, annotation.animationConfig);
-        });
-    }
+            chart.annotations.push(annotation);
 
-    public initAnnotation(
-        this: AnnotationChart,
-        userOptions: AnnotationOptions
-    ): Annotation {
-        const chart = this,
-            types: AnyRecord = Annotation.types,
-            Constructor = (types[userOptions.type || ''] || Annotation),
-            annotation = new Constructor(chart, userOptions);
-
-        chart.annotations.push(annotation);
-
-        return annotation;
-    }
-
-    /**
-     * Remove an annotation from the chart.
-     *
-     * @param {number|string|Highcharts.Annotation} idOrAnnotation
-     * The annotation's id or direct annotation object.
-     */
-    public removeAnnotation(
-        this: AnnotationChart,
-        idOrAnnotation: (number|string|Annotation)
-    ): void {
-        const annotations = this.annotations,
-            annotation: Annotation = (idOrAnnotation as any).coll === 'annotations' ?
-                idOrAnnotation :
-                find(
-                    annotations,
-                    function (annotation: Annotation): boolean {
-                        return annotation.options.id === idOrAnnotation;
-                    }
-                ) as any;
-
-        if (annotation) {
-            fireEvent(annotation, 'remove');
-            erase(this.options.annotations, annotation.options);
-            erase(annotations, annotation);
-            annotation.destroy();
+            return annotation;
         }
+
+        /**
+         * Remove an annotation from the chart.
+         *
+         * @param {number|string|Highcharts.Annotation} idOrAnnotation
+         * The annotation's id or direct annotation object.
+         */
+        public removeAnnotation(
+            this: Chart,
+            idOrAnnotation: (number|string|Annotation)
+        ): void {
+            const chart = this,
+                annotations = chart.annotations,
+                annotation: Annotation = (idOrAnnotation as any).coll === 'annotations' ?
+                    idOrAnnotation :
+                    find(
+                        annotations,
+                        function (annotation: Annotation): boolean {
+                            return annotation.options.id === idOrAnnotation;
+                        }
+                    ) as any;
+
+            if (annotation) {
+                fireEvent(annotation, 'remove');
+                erase(chart.options.annotations, annotation.options);
+                erase(annotations, annotation);
+                annotation.destroy();
+            }
+        }
+
     }
 
-}
-
-/* *
- *
- *  Class Prototype
- *
- * */
-
-interface AnnotationChart extends Chart {
-    annotations: Array<Annotation>;
-    controlPointsGroup: SVGElement;
-    navigationBindings: NavigationBindings;
-    options: AnnotationChart.GlobalOptions;
-    plotBoxClip: SVGElement;
-    addAnnotation(userOptions: AnnotationOptions, redraw?: boolean): Annotation;
-    drawAnnotations(): void;
-    initAnnotation(userOptions: AnnotationOptions): Annotation;
-    removeAnnotation(idOrAnnotation: (number|string|Annotation)): void;
-}
-
-/* *
- *
- *  Class Namespace
- *
- * */
-
-namespace AnnotationChart {
-    export interface GlobalOptions extends Options {
-        annotations: Array<AnnotationOptions>;
-        defs: Record<string, AST.Node>;
-        navigation: Highcharts.NavigationOptions;
-    }
 }
 
 /* *
@@ -423,4 +492,4 @@ namespace AnnotationChart {
  *
  * */
 
-export default AnnotationChart;
+export default AnnotationComposition;

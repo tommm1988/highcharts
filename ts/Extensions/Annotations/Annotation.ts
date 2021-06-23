@@ -18,7 +18,6 @@
 
 import type { VerticalAlignValue } from '../../Core/Renderer/AlignObject';
 import type AnimationOptions from '../../Core/Animation/AnimationOptions';
-import type AnnotationChart from './AnnotationChart';
 import type {
     AnnotationOptions,
     AnnotationLabelOptions
@@ -26,21 +25,21 @@ import type {
 import type { AnnotationTypeRegistry } from './Types/AnnotationType';
 import type AxisType from '../../Core/Axis/AxisType';
 import type BBoxObject from '../../Core/Renderer/BBoxObject';
+import type Chart from '../../Core/Chart/Chart';
 import type ColorString from '../../Core/Color/ColorString';
 import type ColorType from '../../Core/Color/ColorType';
 import type CSSObject from '../../Core/Renderer/CSSObject';
 import type DashStyleValue from '../../Core/Renderer/DashStyleValue';
 import type EventCallback from '../../Core/EventCallback';
 import type MockPointOptions from './MockPointOptions';
-import type PointClass from '../../Core/Series/Point';
-import type SeriesClass from '../../Core/Series/Series';
+import type Pointer from '../../Core/Pointer/Pointer';
 import type SVGElement from '../../Core/Renderer/SVG/SVGElement';
 import type SVGPath from '../../Core/Renderer/SVG/SVGPath';
 import type { SymbolKey } from '../../Core/Renderer/SVG/SymbolType';
 
 import A from '../../Core/Animation/AnimationUtilities.js';
 const { getDeferredAnimation } = A;
-import Chart from '../../Core/Chart/Chart.js';
+import AnnotationComposition from './AnnotationComposition.js';
 import ControllableMixin from './Mixins/ControllableMixin.js';
 import ControllableRect from './Controllables/ControllableRect.js';
 import ControllableCircle from './Controllables/ControllableCircle.js';
@@ -49,24 +48,21 @@ import ControllableImage from './Controllables/ControllableImage.js';
 import ControllableLabel from './Controllables/ControllableLabel.js';
 import ControlPoint from './ControlPoint.js';
 import EventEmitterMixin from './Mixins/EventEmitterMixin.js';
-import H from '../../Core/Globals.js';
 import MockPoint from './MockPoint.js';
-import Pointer from '../../Core/Pointer/Pointer.js';
 import U from '../../Core/Utilities.js';
 import palette from '../../Core/Color/Palette.js';
 const {
-    addEvent,
     defined,
     destroyObjectProperties,
     erase,
     extend,
-    find,
     fireEvent,
     merge,
     pick,
-    splat,
-    wrap
+    splat
 } = U;
+
+// throw new Error('Here it comes!');
 
 /* *
  *
@@ -122,6 +118,12 @@ declare module '../../Core/Pointer/PointerLike' {
  */
 class Annotation implements EventEmitterMixin.Type, ControllableMixin.Type {
 
+    /* *
+     *
+     *  Static Properties
+     *
+     * */
+
     /**
      * @private
      */
@@ -155,24 +157,14 @@ class Annotation implements EventEmitterMixin.Type, ControllableMixin.Type {
      *
      * */
 
-    public static compose(PointerClass: typeof Pointer): void {
-        const pointerProto = PointerClass.prototype;
-
-        if (!pointerProto.hasAnnotationComposition) {
-            pointerProto.hasAnnotationComposition = true;
-
-            const superOnContainerMouseDown = pointerProto.onContainerMouseDown;
-
-            pointerProto.onContainerMouseDown = function (): void {
-                const pointer = this;
-                if (!pointer.chart.hasDraggedAnnotation) {
-                    superOnContainerMouseDown.apply(pointer, arguments);
-                }
-            };
-        }
+    public static compose<T extends typeof Chart>(
+        ChartClass: T,
+        PointerClass: typeof Pointer
+    ): (T&typeof AnnotationComposition.Chart) {
+        return AnnotationComposition.compose(Annotation, ChartClass, PointerClass);
     }
 
-    public static extendAnnotation = function <T extends typeof Annotation> (
+    public static extendAnnotation<T extends typeof Annotation>(
         Constructor: T,
         BaseConstructor: (Function|null),
         prototype: Partial<T['prototype']>,
@@ -192,7 +184,7 @@ class Annotation implements EventEmitterMixin.Type, ControllableMixin.Type {
             Constructor.prototype.defaultOptions,
             defaultOptions || {}
         );
-    };
+    }
 
     /* *
      *
@@ -201,7 +193,7 @@ class Annotation implements EventEmitterMixin.Type, ControllableMixin.Type {
      * */
 
     public constructor(
-        chart: AnnotationChart,
+        chart: AnnotationComposition.Chart,
         userOptions: AnnotationOptions
     ) {
         let labelsAndShapes;
@@ -313,7 +305,7 @@ class Annotation implements EventEmitterMixin.Type, ControllableMixin.Type {
      * */
 
     public annotation: ControllableMixin.Type['annotation'] = void 0 as any;
-    public chart: AnnotationChart;
+    public chart: AnnotationComposition.Chart;
     public clipRect?: SVGElement;
     public clipXAxis?: AxisType;
     public clipYAxis?: AxisType;
@@ -340,7 +332,7 @@ class Annotation implements EventEmitterMixin.Type, ControllableMixin.Type {
      * */
 
     public init(
-        annotationOrChart: (Annotation|AnnotationChart),
+        annotationOrChart: (Annotation|AnnotationComposition.Chart),
         userOptions: DeepPartial<AnnotationOptions>,
         index?: number
     ): void;
@@ -802,7 +794,7 @@ class Annotation implements EventEmitterMixin.Type, ControllableMixin.Type {
         let hasVisiblePoints = false,
             label = item.graphic;
 
-        item.points.forEach(function (point: Highcharts.AnnotationPointType): void {
+        item.points.forEach(function (point): void {
             if (
                 point.series.visible !== false &&
                 point.visible !== false
@@ -1083,7 +1075,7 @@ merge<Annotation>(
                      * @type    {Highcharts.FormatterCallbackFunction<Highcharts.Point>}
                      * @default function () { return defined(this.y) ? this.y : 'Annotation label'; }
                      */
-                    formatter: function (this: Annotation.Point): (number|string) {
+                    formatter: function (this: AnnotationComposition.Point): (number|string) {
                         return defined(this.y) ? this.y : 'Annotation label';
                     },
 
@@ -1513,12 +1505,17 @@ merge<Annotation>(
 );
 
 namespace Annotation {
-    export interface Point extends PointClass {
-        series: Series;
-    }
+
+    /* *
+     *
+     *  Declarations
+     *
+     * */
+
     export interface ControlPointEventsOptions {
         drag?: Highcharts.AnnotationControlPointDragEventFunction;
     }
+
     export interface ControlPointOptions {
         draggable?: undefined;
         events: ControlPointEventsOptions;
@@ -1530,6 +1527,16 @@ namespace Annotation {
         visible: boolean;
         width: number;
     }
+
+    export type DraggableValue = (''|'x'|'y'|'xy');
+
+    export interface EventsOptions {
+        afterUpdate?: EventCallback<Annotation>;
+        add?: EventCallback<Annotation>;
+        click?: EventCallback<Annotation>;
+        remove?: EventCallback<Annotation>;
+    }
+
     export interface LabelsOptions extends AnnotationLabelOptions {
         color?: ColorType;
         dashStyle?: DashStyleValue;
@@ -1539,16 +1546,9 @@ namespace Annotation {
         xAxis?: number|string;
         yAxis?: number|string;
     }
-    export interface Series extends SeriesClass {
-        chart: AnnotationChart;
-        points: Array<PointClass>;
-    }
-    export interface EventsOptions {
-        afterUpdate?: EventCallback<Annotation>;
-        add?: EventCallback<Annotation>;
-        click?: EventCallback<Annotation>;
-        remove?: EventCallback<Annotation>;
-    }
+
+    export type LabelType = ControllableLabel;
+
     export interface ShapeOptions extends Highcharts.AnnotationControllableOptionsObject {
         d?: (string|Function|SVGPath);
         fill: ColorType;
@@ -1562,12 +1562,19 @@ namespace Annotation {
         type: string;
         width?: number;
     }
+
     export interface ShapesOptions extends ShapeOptions {
         markerEnd?: string;
         markerStart?: string;
         point?: (string|MockPointOptions);
         points?: Array<(string|MockPointOptions)>;
     }
+
+    export type ShapeType = (
+        ControllableCircle|ControllableImage|ControllablePath|
+        ControllableRect
+    );
+
     export interface TypeOptions {
         background?: ShapeOptions;
         height?: number;
@@ -1577,6 +1584,7 @@ namespace Annotation {
         xAxis?: number;
         yAxis?: number;
     }
+
     export interface TypePointsOptions {
         controlPoint?: number;
         x?: number;
@@ -1584,12 +1592,6 @@ namespace Annotation {
         y?: number;
         yAxis?: number;
     }
-    export type DraggableValue = (''|'x'|'y'|'xy');
-    export type LabelType = ControllableLabel;
-    export type ShapeType = (
-        ControllableCircle|ControllableImage|ControllablePath|
-        ControllableRect
-    );
 }
 
 /* *

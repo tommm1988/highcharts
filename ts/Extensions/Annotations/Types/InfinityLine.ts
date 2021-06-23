@@ -12,7 +12,7 @@
  *
  * */
 
-import type AnnotationChart from '../AnnotationChart';
+import type AnnotationComposition from '../AnnotationComposition';
 import type Axis from '../../../Core/Axis/Axis';
 import type PositionObject from '../../../Core/Renderer/PositionObject';
 
@@ -163,7 +163,10 @@ class InfinityLine extends CrookedLine {
      *
      * */
 
-    public constructor(chart: AnnotationChart, options: InfinityLine.Options) {
+    public constructor(
+        chart: AnnotationComposition.Chart,
+        options: InfinityLine.Options
+    ) {
         super(chart, options);
     }
 

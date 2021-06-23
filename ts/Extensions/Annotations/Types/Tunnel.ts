@@ -6,7 +6,7 @@
 
 'use strict';
 
-import type AnnotationChart from '../AnnotationChart';
+import type AnnotationComposition from '../AnnotationComposition';
 import type MockPointOptions from '../MockPointOptions';
 import type PositionObject from '../../../Core/Renderer/PositionObject';
 import Annotation from '../Annotation.js';
@@ -33,11 +33,14 @@ class Tunnel extends CrookedLine {
 
     /* *
      *
-     * Constructors
+     * Constructor
      *
      * */
 
-    public constructor(chart: AnnotationChart, options: Tunnel.Options) {
+    public constructor(
+        chart: AnnotationComposition.Chart,
+        options: Tunnel.Options
+    ) {
         super(chart, options);
     }
 

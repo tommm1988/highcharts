@@ -10,7 +10,7 @@
 
 'use strict';
 
-import type AnnotationChart from './AnnotationChart';
+import type AnnotationComposition from './AnnotationComposition';
 import type AnnotationOptions from './AnnotationOptions';
 import type { HTMLDOMElement } from '../../Core/Renderer/DOMElementType';
 import type MockPointOptions from './MockPointOptions';
@@ -37,12 +37,6 @@ const {
     objectEach,
     pick
 } = U;
-
-declare module './AnnotationChart'{
-    interface AnnotationChart {
-        navigationBindings: NavigationBindings;
-    }
-}
 
 declare module './AnnotationOptions'{
     interface AnnotationOptions {
@@ -344,7 +338,7 @@ class NavigationBindings {
      * */
 
     public constructor(
-        chart: AnnotationChart,
+        chart: AnnotationComposition.Chart,
         options: Highcharts.NavigationOptions
     ) {
         this.chart = chart;
@@ -363,7 +357,7 @@ class NavigationBindings {
 
     public activeAnnotation?: (false|Annotation);
     public boundClassNames: Record<string, Highcharts.NavigationBindingsOptionsObject> = void 0 as any;
-    public chart: AnnotationChart;
+    public chart: AnnotationComposition.Chart;
     public container: HTMLCollectionOf<HTMLDOMElement>;
     public currentUserDetails?: Annotation;
     public eventsToUnbind: Array<Function>;
@@ -573,7 +567,7 @@ class NavigationBindings {
      *        Browser's click event.
      */
     public bindingsChartClick(
-        chart: AnnotationChart,
+        chart: AnnotationComposition.Chart,
         clickEvent: PointerEvent
     ): void {
         chart = this.chart;
@@ -1041,7 +1035,7 @@ interface NavigationBindings {
 NavigationBindings.prototype.utils = bindingsUtils;
 
 
-Chart.prototype.initNavigationBindings = function (this: AnnotationChart): void {
+Chart.prototype.initNavigationBindings = function (this: AnnotationComposition.Chart): void {
     const chart = this,
         options = chart.options;
 

@@ -6,15 +6,28 @@
 
 'use strict';
 
-import type AnnotationChart from '../AnnotationChart';
+/* *
+ *
+ *  Imports
+ *
+ * */
+
+import type AnnotationComposition from '../AnnotationComposition';
 import type AnnotationOptions from '../AnnotationOptions';
 import type PositionObject from '../../../Core/Renderer/PositionObject';
 import type MockPointOptions from '../MockPointOptions';
+
 import Annotation from '../Annotation.js';
 import ControlPoint from '../ControlPoint.js';
 import MockPoint from '../MockPoint.js';
 import U from '../../../Core/Utilities.js';
 const { merge } = U;
+
+/* *
+ *
+ *  Declarations
+ *
+ * */
 
 declare module '../MockPointOptions' {
     interface MockPointOptions {
@@ -22,22 +35,32 @@ declare module '../MockPointOptions' {
     }
 }
 
+/* *
+ *
+ *  Class
+ *
+ * */
+
 /* eslint-disable no-invalid-this, valid-jsdoc */
 
 class CrookedLine extends Annotation {
 
     /* *
      *
-     * Constructors
+     *  Constructor
      *
      * */
-    public constructor(chart: AnnotationChart, options: CrookedLine.Options) {
+
+    public constructor(
+        chart: AnnotationComposition.Chart,
+        options: CrookedLine.Options
+    ) {
         super(chart, options);
     }
 
     /* *
      *
-     * Functions
+     *  Functions
      *
      * */
 
@@ -113,6 +136,12 @@ class CrookedLine extends Annotation {
         typeOptions.line = shape.options;
     }
 }
+
+/* *
+ *
+ *  Class Prototype
+ *
+ * */
 
 /**
  * @private
@@ -247,6 +276,12 @@ CrookedLine.prototype.defaultOptions = merge(
     }
 );
 
+/* *
+ *
+ *  Class Namespace
+ *
+ * */
+
 namespace CrookedLine {
     export interface Options extends AnnotationOptions {
         typeOptions: TypeOptions;
@@ -271,7 +306,7 @@ declare module './AnnotationType'{
 
 /* *
  *
- *  Export Default
+ *  Default Export
  *
  * */
 

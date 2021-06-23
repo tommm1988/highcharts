@@ -6,10 +6,17 @@
 
 'use strict';
 
-import type AnnotationChart from '../AnnotationChart';
+/* *
+ *
+ *  Imports
+ *
+ * */
+
+import type AnnotationComposition from '../AnnotationComposition';
 import type ColorType from '../../../Core/Color/ColorType';
 import type { AnnotationLabelOptions } from '../../../Extensions/Annotations/AnnotationOptions';
 import type MockPointOptions from '../MockPointOptions';
+
 import Annotation from '../Annotation.js';
 import CrookedLine from './CrookedLine.js';
 import U from '../../../Core/Utilities.js';
@@ -17,16 +24,38 @@ const {
     merge
 } = U;
 
+/* *
+ *
+ *  Declarations
+ *
+ * */
+
 declare module '../MockPointOptions' {
     interface MockPointOptions {
         label?: AnnotationLabelOptions;
     }
 }
 
+/* *
+ *
+ *  Class
+ *
+ * */
+
 /* eslint-disable no-invalid-this, valid-jsdoc */
 
 class ElliottWave extends CrookedLine {
-    public constructor(chart: AnnotationChart, options: ElliottWave.Options) {
+
+    /* *
+     *
+     *  Constructor
+     *
+     * */
+
+    public constructor(
+        chart: AnnotationComposition.Chart,
+        options: ElliottWave.Options
+    ) {
         super(chart, options);
     }
 

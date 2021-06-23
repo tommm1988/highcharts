@@ -11,7 +11,7 @@
  * */
 
 import type Annotation from './Annotation';
-import type AnnotationChart from './AnnotationChart';
+import type AnnotationComposition from './AnnotationComposition';
 import type AnnotationOptions from './AnnotationOptions';
 import type Chart from '../../Core/Chart/Chart';
 import type { HTMLDOMElement } from '../../Core/Renderer/DOMElementType';
@@ -75,7 +75,7 @@ declare global {
             public init(parentDiv: HTMLDOMElement, iconsURL: string, chart?: Chart): void;
             public showForm(
                 type: string,
-                chart: AnnotationChart,
+                chart: AnnotationComposition.Chart,
                 options: AnnotationOptions,
                 callback: Function
             ): void;
@@ -84,7 +84,7 @@ declare global {
         interface PopupAnnotationsObject {
             addForm(
                 this: Popup,
-                chart: AnnotationChart,
+                chart: AnnotationComposition.Chart,
                 options: AnnotationOptions,
                 callback: Function,
                 isInit?: boolean
@@ -92,13 +92,18 @@ declare global {
             addFormFields(
                 this: Popup,
                 parentDiv: HTMLDOMElement,
-                chart: AnnotationChart,
+                chart: AnnotationComposition.Chart,
                 parentNode: string,
                 options: AnnotationOptions,
                 storage: Array<unknown>,
                 isRoot?: boolean
             ): void;
-            addToolbar(this: Popup, chart: AnnotationChart, options: AnnotationOptions, callback: Function): void;
+            addToolbar(
+                this: Popup,
+                chart: AnnotationComposition.Chart,
+                options: AnnotationOptions,
+                callback: Function
+            ): void;
         }
         interface PopupConfigObject {
             annotation: Annotation;
@@ -117,18 +122,28 @@ declare global {
             type?: string;
         }
         interface PopupIndicatorsObject {
-            addForm(this: Popup, chart: AnnotationChart, options: AnnotationOptions, callback: Function): void;
+            addForm(
+                this: Popup,
+                chart: AnnotationComposition.Chart,
+                options: AnnotationOptions,
+                callback: Function
+            ): void;
             addFormFields(
                 this: Popup,
-                chart: AnnotationChart,
+                chart: AnnotationComposition.Chart,
                 series: SMAIndicator,
                 seriesType: string,
                 rhsColWrapper: HTMLDOMElement
             ): void;
-            addIndicatorList(this: Popup, chart: AnnotationChart, parentDiv: HTMLDOMElement, listType: string): void;
+            addIndicatorList(
+                this: Popup,
+                chart: AnnotationComposition.Chart,
+                parentDiv: HTMLDOMElement,
+                listType: string
+            ): void;
             addParamInputs(
                 this: Popup,
-                chart: AnnotationChart,
+                chart: AnnotationComposition.Chart,
                 parentNode: string,
                 fields: PopupFieldsDictionary<string>,
                 type: string,
@@ -140,7 +155,7 @@ declare global {
                 this: Popup,
                 type: string,
                 optionName: string,
-                chart: AnnotationChart,
+                chart: AnnotationComposition.Chart,
                 parentDiv: HTMLDOMElement,
                 selectedOption: string
             ): void;
@@ -149,7 +164,7 @@ declare global {
             addContentItem(): HTMLDOMElement;
             addMenuItem(this: Popup, tabName: string, disableTab?: number): HTMLDOMElement;
             deselectAll(this: Popup): void;
-            init(this: Popup, chart: AnnotationChart): void;
+            init(this: Popup, chart: AnnotationComposition.Chart): void;
             selectTab(this: Popup, tab: Element, index: number): void;
             switchTabs(this: Popup, disableTab: number): void;
         }
@@ -461,7 +476,7 @@ H.Popup.prototype = {
      */
     showForm: function (
         type: string,
-        chart: AnnotationChart,
+        chart: AnnotationComposition.Chart,
         options: AnnotationOptions,
         callback: Function
     ): void {
@@ -514,7 +529,7 @@ H.Popup.prototype = {
          */
         addToolbar: function (
             this: Highcharts.Popup,
-            chart: AnnotationChart,
+            chart: AnnotationComposition.Chart,
             options: AnnotationOptions,
             callback: Function
         ): void {
@@ -594,7 +609,7 @@ H.Popup.prototype = {
          */
         addForm: function (
             this: Highcharts.Popup,
-            chart: AnnotationChart,
+            chart: AnnotationComposition.Chart,
             options: AnnotationOptions,
             callback: Function,
             isInit?: boolean
@@ -666,7 +681,7 @@ H.Popup.prototype = {
         addFormFields: function (
             this: Highcharts.Popup,
             parentDiv: HTMLDOMElement,
-            chart: AnnotationChart,
+            chart: AnnotationComposition.Chart,
             parentNode: string,
             options: AnnotationOptions,
             storage: Array<unknown>,
@@ -763,7 +778,7 @@ H.Popup.prototype = {
          */
         addForm: function (
             this: Highcharts.Popup,
-            chart: AnnotationChart,
+            chart: AnnotationComposition.Chart,
             _options: AnnotationOptions,
             callback: Function
         ): void {
@@ -838,7 +853,7 @@ H.Popup.prototype = {
          */
         addIndicatorList: function (
             this: Highcharts.Popup,
-            chart: AnnotationChart,
+            chart: AnnotationComposition.Chart,
             parentDiv: HTMLDOMElement,
             listType: string
         ): void {
@@ -972,7 +987,7 @@ H.Popup.prototype = {
             this: Highcharts.Popup,
             type: string,
             optionName: string,
-            chart: AnnotationChart,
+            chart: AnnotationComposition.Chart,
             parentDiv: HTMLDOMElement,
             selectedOption: string
         ): void {
@@ -1053,7 +1068,7 @@ H.Popup.prototype = {
          */
         addFormFields: function (
             this: Highcharts.Popup,
-            chart: AnnotationChart,
+            chart: AnnotationComposition.Chart,
             series: SMAIndicator,
             seriesType: string,
             rhsColWrapper: HTMLDOMElement
@@ -1137,7 +1152,7 @@ H.Popup.prototype = {
          */
         addParamInputs: function (
             this: Highcharts.Popup,
-            chart: AnnotationChart,
+            chart: AnnotationComposition.Chart,
             parentNode: string,
             fields: Highcharts.PopupFieldsDictionary<string>,
             type: string,
@@ -1211,7 +1226,10 @@ H.Popup.prototype = {
          * @param {Highcharts.Chart} chart
          * Reference to current chart
          */
-        init: function (this: Highcharts.Popup, chart: AnnotationChart): void {
+        init: function (
+            this: Highcharts.Popup,
+            chart: AnnotationComposition.Chart
+        ): void {
             let tabs = this.tabs,
                 indicatorsCount = this.indicators.getAmount.call(chart),
                 firstTab; // run by default

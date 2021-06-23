@@ -7,7 +7,7 @@
 'use strict';
 
 import type Annotation from '../Annotation';
-import type AnnotationChart from '../AnnotationChart';
+import type AnnotationComposition from '../AnnotationComposition';
 import type BBoxObject from '../../../Core/Renderer/BBoxObject';
 import type MockPointOptions from '../MockPointOptions';
 import type SVGAttributes from '../../../Core/Renderer/SVG/SVGAttributes';
@@ -35,7 +35,7 @@ declare global {
         }
         interface AnnotationControllable extends AnnotationControllableMixin {
             annotation: Annotation;
-            chart: AnnotationChart;
+            chart: AnnotationComposition.Chart;
             collection: string;
             controlPoints: Array<AnnotationControlPoint>;
             graphic: SVGElement;
@@ -513,7 +513,7 @@ const controllableMixin: Highcharts.AnnotationControllableMixin = {
      * @param {number} dy translation for y coordinate
      */
     translateShape: function (this: Highcharts.AnnotationControllable, dx: number, dy: number): void {
-        const chart: AnnotationChart = this.annotation.chart,
+        const chart: AnnotationComposition.Chart = this.annotation.chart,
             // Annotation.options
             shapeOptions = this.annotation.userOptions,
             // Chart.options.annotations

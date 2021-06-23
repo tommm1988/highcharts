@@ -6,7 +6,7 @@
 
 'use strict';
 
-import type AnnotationChart from '../AnnotationChart';
+import type AnnotationComposition from '../AnnotationComposition';
 import type PositionObject from '../../../Core/Renderer/PositionObject';
 import type MockPointOptions from '../MockPointOptions';
 import Annotation from '../Annotation.js';
@@ -89,7 +89,10 @@ class Pitchfork extends InfinityLine {
      *
      * */
 
-    public constructor(chart: AnnotationChart, options: Pitchfork.Options) {
+    public constructor(
+        chart: AnnotationComposition.Chart,
+        options: Pitchfork.Options
+    ) {
         super(chart, options);
     }
 

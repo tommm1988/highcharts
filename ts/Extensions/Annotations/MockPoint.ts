@@ -6,8 +6,7 @@
 
 'use strict';
 
-import type Annotation from './Annotation';
-import type AnnotationChart from '../Annotations/AnnotationChart';
+import type AnnotationComposition from './AnnotationComposition';
 import type MockPointOptions from './MockPointOptions';
 import type PositionObject from '../../Core/Renderer/PositionObject';
 import Series from '../../Core/Series/Series.js';
@@ -28,7 +27,7 @@ declare global {
             public static pointToOptions(point: AnnotationPointType): MockPointOptions;
             public static pointToPixels(point: AnnotationPointType, paneCoordinates?: boolean): PositionObject;
             public constructor(
-                chart: AnnotationChart,
+                chart: AnnotationComposition.Chart,
                 target: (AnnotationControllable|null),
                 options: (MockPointOptions|Function)
             );
@@ -59,7 +58,7 @@ declare global {
             public translate(cx: (number|undefined), cy: (number|undefined), dx: number, dy: number): void
         }
         interface AnnotationMockSeries {
-            chart: AnnotationChart;
+            chart: AnnotationComposition.Chart;
             getPlotBox: Series['getPlotBox'];
             xAxis?: (Axis|null);
             yAxis?: (Axis|null);
@@ -231,7 +230,7 @@ class MockPoint {
     }
 
     public constructor(
-        chart: AnnotationChart,
+        chart: AnnotationComposition.Chart,
         target: (Highcharts.AnnotationControllable|null),
         options: (MockPointOptions|Function)
     ) {
@@ -605,7 +604,7 @@ class MockPoint {
 }
 
 namespace MockPoint {
-    export interface Point extends Annotation.Point {
+    export interface Point extends AnnotationComposition.Point {
         command?: undefined;
         mock?: undefined;
     }

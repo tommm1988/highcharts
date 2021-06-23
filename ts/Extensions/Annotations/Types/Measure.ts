@@ -6,7 +6,7 @@
 
 'use strict';
 
-import type AnnotationChart from '../AnnotationChart';
+import type AnnotationComposition from '../AnnotationComposition';
 import type AnnotationOptions from '../AnnotationOptions';
 import type Axis from '../../../Core/Axis/Axis';
 import type CSSObject from '../../../Core/Renderer/CSSObject';
@@ -359,7 +359,7 @@ class Measure extends Annotation {
      * */
 
     public constructor(
-        chart: AnnotationChart,
+        chart: AnnotationComposition.Chart,
         userOptions: Measure.MeasureOptions
     ) {
         super(chart, userOptions);
@@ -376,7 +376,7 @@ class Measure extends Annotation {
      * @private
      */
     public init(
-        annotationOrChart: (Annotation|AnnotationChart),
+        annotationOrChart: (Annotation|AnnotationComposition.Chart),
         userOptions: Measure.MeasureOptions,
         index?: number
     ): void {

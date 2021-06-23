@@ -14,7 +14,7 @@
 
 import type Axis from '../../../Core/Axis/Axis';
 import type { DOMElementType } from '../../../Core/Renderer/DOMElementType';
-import type Annotation from '../../../Extensions/Annotations/Annotation';
+import type AnnotationComposition from '../../../Extensions/Annotations/AnnotationComposition';
 import type Point from '../../../Core/Series/Point';
 import type PositionObject from '../../../Core/Renderer/PositionObject';
 import type Series from '../../../Core/Series/Series';
@@ -463,7 +463,7 @@ function getPointValue(
 function getPointAnnotationDescription(point: Point): string {
     const chart = point.series.chart;
     const langKey = 'accessibility.series.pointAnnotationsDescription';
-    const annotations = getPointAnnotationTexts(point as Annotation.Point);
+    const annotations = getPointAnnotationTexts(point as AnnotationComposition.Point);
     const context = { point, annotations };
 
     return annotations.length ? chart.langFormat(langKey, context) : '';

@@ -6,7 +6,7 @@
 
 'use strict';
 
-import type AnnotationChart from '../AnnotationChart';
+import type AnnotationComposition from '../AnnotationComposition';
 import type {
     AnnotationOptions,
     AnnotationLabelOptions
@@ -83,7 +83,7 @@ class VerticalLine extends Annotation {
      * */
 
     public constructor(
-        chart: AnnotationChart,
+        chart: AnnotationComposition.Chart,
         userOptions: VerticalLine.Options
     ) {
         super(chart, userOptions);

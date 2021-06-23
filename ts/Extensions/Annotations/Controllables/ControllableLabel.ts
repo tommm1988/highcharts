@@ -16,7 +16,7 @@ import '../../../Core/Renderer/SVG/SVGRenderer.js';
 
 import type { AlignObject } from '../../../Core/Renderer/AlignObject';
 import type Annotation from '../Annotation';
-import type AnnotationChart from '../AnnotationChart';
+import type AnnotationComposition from '../AnnotationComposition';
 import type BBoxObject from '../../../Core/Renderer/BBoxObject';
 import type { AnnotationLabelOptions } from '../../../Extensions/Annotations/AnnotationOptions';
 import type PositionObject from '../../../Core/Renderer/PositionObject';
@@ -160,7 +160,7 @@ class ControllableLabel implements ControllableMixin.Type {
      * it works with absolute instead of relative position.
      */
     public static justifiedOptions(
-        chart: AnnotationChart,
+        chart: AnnotationComposition.Chart,
         label: SVGElement,
         alignOptions: Highcharts.AnnotationAlignObject,
         alignAttr: SVGAttributes

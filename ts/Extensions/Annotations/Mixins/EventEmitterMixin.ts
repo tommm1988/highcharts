@@ -5,7 +5,7 @@
  * */
 
 import type Annotation from '../Annotation';
-import type AnnotationChart from '../AnnotationChart';
+import type AnnotationComposition from '../AnnotationComposition';
 import type AnnotationOptions from '../AnnotationOptions';
 import type { CursorValue } from '../../../Core/Renderer/CSSObject';
 import type DOMElementType from '../../../Core/Renderer/DOMElementType';
@@ -22,7 +22,7 @@ declare global {
     namespace Highcharts {
         interface AnnotationEventEmitter extends AnnotationEventEmitterMixin {
             cancelClick?: boolean;
-            chart: AnnotationChart;
+            chart: AnnotationComposition.Chart;
             graphic: SVGElement;
             hasDragged?: boolean;
             hcEvents?: unknown;

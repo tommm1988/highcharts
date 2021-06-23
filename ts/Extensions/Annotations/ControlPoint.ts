@@ -5,7 +5,7 @@
  * */
 
 import type Annotation from './Annotation';
-import type AnnotationChart from './AnnotationChart';
+import type AnnotationComposition from './AnnotationComposition';
 import type PositionObject from '../../Core/Renderer/PositionObject';
 import type SVGElement from '../../Core/Renderer/SVG/SVGElement';
 
@@ -17,13 +17,13 @@ declare global {
     namespace Highcharts {
         class AnnotationControlPoint implements AnnotationEventEmitter {
             public constructor(
-                chart: AnnotationChart,
+                chart: AnnotationComposition.Chart,
                 target: AnnotationControllable,
                 options: Partial<Annotation.ControlPointOptions>,
                 index?: number
             );
             public addEvents: AnnotationEventEmitterMixin['addEvents'];
-            public chart: AnnotationChart;
+            public chart: AnnotationComposition.Chart;
             public graphic: SVGElement;
             public index: number;
             public mouseMoveToRadians: AnnotationEventEmitterMixin['mouseMoveToRadians'];
@@ -96,7 +96,7 @@ import eventEmitterMixin from './Mixins/EventEmitterMixin.js';
  */
 class ControlPoint implements eventEmitterMixin.Type {
     public constructor(
-        chart: AnnotationChart,
+        chart: AnnotationComposition.Chart,
         target: Highcharts.AnnotationControllable,
         options: Annotation.ControlPointOptions,
         index?: number
@@ -114,7 +114,7 @@ class ControlPoint implements eventEmitterMixin.Type {
      * */
 
     public addEvents = eventEmitterMixin.addEvents;
-    public chart: AnnotationChart;
+    public chart: AnnotationComposition.Chart;
     public graphic: SVGElement = void 0 as any;
     public index: number;
     public mouseMoveToRadians = eventEmitterMixin.mouseMoveToRadians;
