@@ -1,5 +1,6 @@
 import type CSSObject from '../../Core/Renderer/CSSObject';
 import type Options from '../../Core/Options.js';
+import type TextOptions from './TextOptions';
 import AST from '../../Core/Renderer/HTML/AST.js';
 import Chart from '../../Core/Chart/Chart.js';
 import Component from './Component.js';
@@ -97,7 +98,7 @@ class KPIComponent extends Component {
             className: `${Component.defaultOptions.className}-kpi-value`
         });
         this.subtitle = createElement('div', {
-            className: `${Component.defaultOptions.className}-kpi-subtitle`
+            className: this.getSubtitleClassName()
         });
         this.chartContainer = createElement('figure', {
             className: `${Component.defaultOptions.className}-kpi-chart-container`
@@ -119,7 +120,7 @@ class KPIComponent extends Component {
             this.updateSize(this.dimensions.width, this.dimensions.height);
         }
 
-        this.on('resize', () => {
+        this.on('resize', (): void => {
             if (this.dimensions.width && this.dimensions.height) {
                 this.updateSize(this.dimensions.width, this.dimensions.height);
             }
@@ -127,7 +128,7 @@ class KPIComponent extends Component {
             if (this.chart) {
                 this.chart.reflow();
             }
-        })
+        });
 
         return this;
     }
@@ -173,6 +174,7 @@ class KPIComponent extends Component {
     private updateElements(): void {
         const {
             style,
+            subtitle,
             valueFormat,
             valueFormatter
         } = this.options;
@@ -204,6 +206,12 @@ class KPIComponent extends Component {
 
         if (style) {
             css(this.element, style);
+        }
+        if (typeof subtitle === 'object') {
+            if (subtitle.style) {
+                css(this.subtitle, subtitle.style);
+            }
+            this.subtitle.className = this.getSubtitleClassName();
         }
 
         this.chartContainer.style.flex = this.options.chart ? '1' : '0';
@@ -246,11 +254,16 @@ class KPIComponent extends Component {
                         v: diff / this.prevValue * 100
                     });
                 }
-            } else {
-                return subtitle.text || '';
             }
+            return subtitle.text || '';
         }
         return '';
+    }
+
+    private getSubtitleClassName(): string {
+        const { subtitle } = this.options;
+        return `${Component.defaultOptions.className}-kpi-subtitle` +
+            ((typeof subtitle === 'object' && subtitle.className) || '');
     }
 
     private getValueColor(): string {
@@ -293,9 +306,8 @@ namespace KPIComponent {
         valueFormatter?: ValueFormatterCallbackFunction;
     }
 
-    export interface SubtitleOptions {
+    export interface SubtitleOptions extends TextOptions {
         type?: SubtitleType;
-        text?: string;
     }
 
     export type SubtitleType = 'text' | 'diff' | 'diffpercent';
