@@ -20,7 +20,7 @@ const {
 } = U;
 
 class KPIComponent extends Component {
-    public static defaultOptions: KPIComponent.ComponentOptions = merge(
+    public static defaultOptions = merge(
         Component.defaultOptions,
         {
             className: [
@@ -167,8 +167,7 @@ class KPIComponent extends Component {
             this.chart.update(options.chart);
         }
 
-        this.redraw();
-        return this;
+        return this.redraw();
     }
 
     private updateElements(): void {
